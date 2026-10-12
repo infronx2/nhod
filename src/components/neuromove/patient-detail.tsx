@@ -62,6 +62,7 @@ import { RomTrendChart } from '@/components/neuromove/rom-trend-chart'
 import { ActivityHeatmap } from '@/components/neuromove/activity-heatmap'
 import { CompTrendChart } from '@/components/neuromove/comp-trend-chart'
 import { LimbBreakdown } from '@/components/neuromove/limb-breakdown'
+import { ProgressTimeline } from '@/components/neuromove/progress-timeline'
 import { BadgesPanel } from '@/components/neuromove/badges-panel'
 import { FhirViewer } from '@/components/neuromove/fhir-viewer'
 
@@ -396,6 +397,11 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
           <LimbBreakdown sessions={detail?.sessions ?? []} loading={loading} />
         </Card>
       </div>
+
+      {/* ---------- Progress timeline (milestone narrative) ---------- */}
+      <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
+        <ProgressTimeline patientId={patientId} loading={loading} />
+      </Card>
 
       {/* ---------- Badges + Sessions table ---------- */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

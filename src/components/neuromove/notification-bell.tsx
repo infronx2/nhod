@@ -48,8 +48,10 @@ const SEVERITY_COLOR: Record<string, string> = {
 
 /**
  * NotificationBell — a header bell icon with an unread-count badge and a
- * dropdown feed. Polls /api/v2/notifications every 30s while the dropdown is
- * closed and immediately on open. Supports mark-one-read (click) and
+ * dropdown feed. Uses Server-Sent Events (SSE) for real-time delivery: a
+ * persistent EventSource connection pushes new notifications the moment they're
+ * created, so there's no 30s polling delay. Falls back to an initial fetch
+ * on open to populate the dropdown list. Supports mark-one-read (click) and
  * mark-all-read (button).
  */
 export function NotificationBell() {
@@ -58,6 +60,7 @@ export function NotificationBell() {
   const [notifications, setNotifications] = React.useState<Notification[]>([])
   const [unread, setUnread] = React.useState(0)
   const [loading, setLoading] = React.useState(false)
+  const [live, setLive] = React.useState(false)
 
   const fetchNotifications = React.useCallback(async () => {
     if (!user) return
@@ -74,15 +77,53 @@ export function NotificationBell() {
     }
   }, [user])
 
-  // Poll while the dropdown is closed; fetch immediately on open.
+  // Real-time SSE: open a persistent EventSource that pushes new
+  // notifications the moment they're created. Replaces the 30s poll.
   React.useEffect(() => {
     if (!user) return
+    // Initial fetch so the badge hydrates even if SSE is slow to connect.
     void fetchNotifications()
-    if (open) return
-    const id = window.setInterval(() => void fetchNotifications(), POLL_MS)
-    return () => window.clearInterval(id)
+
+    let es: EventSource | null = null
+    try {
+      es = new EventSource('/api/v2/notifications/stream')
+      es.addEventListener('hello', (ev) => {
+        try {
+          const data = JSON.parse((ev as MessageEvent).data)
+          setUnread(data.unreadCount ?? 0)
+          setLive(true)
+        } catch { /* ignore */ }
+      })
+      es.addEventListener('notification', (ev) => {
+        try {
+          const n = JSON.parse((ev as MessageEvent).data) as Notification
+          setNotifications((prev) =>
+            prev.some((x) => x.id === n.id) ? prev : [n, ...prev].slice(0, 50),
+          )
+          setUnread((u) => u + 1)
+        } catch { /* ignore */ }
+      })
+      es.onerror = () => {
+        setLive(false)
+        // EventSource auto-reconnects; if it fails repeatedly, the 30s
+        // fallback below keeps the feed fresh.
+      }
+    } catch {
+      // EventSource not available (SSR) — the fallback poll handles it.
+    }
+
+    // Fallback poll (slower — 30s) in case SSE isn't available or drops.
+    const pollId = window.setInterval(() => {
+      if (!open) void fetchNotifications()
+    }, POLL_MS)
+
+    return () => {
+      es?.close()
+      window.clearInterval(pollId)
+    }
   }, [user, fetchNotifications, open])
 
+  // When the dropdown opens, do a fresh fetch to show the full list.
   React.useEffect(() => {
     if (open) void fetchNotifications()
   }, [open, fetchNotifications])
@@ -161,6 +202,15 @@ export function NotificationBell() {
                   {unread > 0 && (
                     <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium text-rose-500">
                       {unread} new
+                    </span>
+                  )}
+                  {live && (
+                    <span className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-medium text-emerald-500">
+                      <span className="relative inline-flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      </span>
+                      live
                     </span>
                   )}
                 </div>

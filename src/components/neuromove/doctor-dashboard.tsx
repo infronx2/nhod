@@ -23,6 +23,7 @@ import type { V2PatientsResponse, V2PatientSummary, V2Stats } from '@/lib/v2-typ
 import { GradientAvatar } from '@/components/neuromove/gradient-avatar'
 import { AnimatedKpi } from '@/components/neuromove/animated-kpi'
 import { ActivityHeatmap } from '@/components/neuromove/activity-heatmap'
+import { DoctorAnalytics } from '@/components/neuromove/doctor-analytics'
 import { PatientDetail } from '@/components/neuromove/patient-detail'
 
 interface DoctorDashboardProps {
@@ -171,6 +172,9 @@ export function DoctorDashboard({ doctorId }: DoctorDashboardProps) {
       <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
         <ActivityHeatmap weeks={12} title="Clinic activity · last 12 weeks (all patients)" />
       </Card>
+
+      {/* ---------- Analytics: accuracy distribution + plan adherence ---------- */}
+      <DoctorAnalytics />
 
       {/* ---------- Roster ---------- */}
       <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">

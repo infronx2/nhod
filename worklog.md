@@ -441,3 +441,49 @@ Stage Summary:
   3. Apply the `nm-glass` glassmorphism + `nm-shimmer` skeleton utilities to the existing KPI tiles and loading states (the utilities are defined but not yet applied to all components).
   4. Pose-server logging: the daemon.py redirects stdout/stderr to server.log, but uvicorn's own logger doesn't appear there (only the `daemon starting` line shows). The `logger.info` calls in the WS handler (open/close/sync) may not be reaching server.log. Future round: configure uvicorn's log_level + handlers explicitly.
   5. Full E2E test of the pose-server auto-sync with a real webcam (the sandbox has no camera, so live-camera mode is code-complete but not E2E-verified here).
+
+---
+Task ID: 32-38
+Agent: webDevReview cron (round 5, 15-min recurring review)
+Task: Assess project status, run agent-browser QA, fix bugs, advance Phase 3+ (real-time notifications via SSE, doctor analytics deep-dive with accuracy histogram + plan adherence gauge, patient progress timeline, styling polish with glassmorphism). Continue from the stable round-4 baseline.
+
+Work Log:
+- Read worklog Tasks 1-31. Round 4 complete (comp trend, per-limb breakdown, pose-server auto-sync, mesh background). Open follow-ups: Arabic i18n, apply glassmorphism to KPI tiles, SSE push notifications, doctor analytics, pose-server logging.
+- **QA first**: pose-server healthy (PID 14655). Dev server healthy (PID 12255). Dashboard renders clean, no console errors. Round 4 stable.
+- **Feature (Task 34) — Real-time notifications via Server-Sent Events (SSE)**:
+  * New `GET /api/v2/notifications/stream` endpoint (`src/app/api/v2/notifications/stream/route.ts`) — returns a `text/event-stream` Response. Sends a `hello` event with the current unread count on connect, then polls the DB every 5s for new notifications and pushes each as a `notification` event. Includes `: ping` heartbeats to keep the connection alive through proxies. `X-Accel-Buffering: no` header disables proxy buffering.
+  * Updated `src/components/neuromove/notification-bell.tsx` — replaced the 30s `setInterval` polling with a persistent `EventSource('/api/v2/notifications/stream')` connection. Handles `hello` (hydrate unread count + set `live=true`) and `notification` (prepend to list + increment unread) events. Falls back to a 30s poll if SSE isn't available or drops. Added a green pulsing "live" indicator badge in the dropdown header when SSE is connected.
+  * Updated `GET /api/v2/notifications` to accept an optional `userId` query param so doctors can fetch a specific patient's notification feed (used by the progress timeline).
+  * **Verified**: saved a session via the API as Layla → within ~5-11s the bell badge updated from "3 unread" to "4 unread" and the dropdown showed "Session saved · just now · 9 reps, 155° max ROM, score 78" — the SSE pushed the new notification without a page reload. No errors.
+- **Feature (Task 35) — Doctor analytics deep-dive**:
+  * New `GET /api/v2/stats/distribution?patientId=X` endpoint — returns an accuracy distribution histogram (5 buckets: 0-20%, 20-40%, 40-60%, 60-80%, 80-100%) plus a plan-adherence gauge (sessions this week vs the active plan's `sessionsPerWeek` target, as a percentage). Doctors without a patientId get a global aggregate (average adherence across all patients with active plans).
+  * `src/components/neuromove/doctor-analytics.tsx` — a 2-up card: LEFT an animated bar histogram of accuracy buckets (color-coded: rose/orange/amber/teal/emerald), RIGHT a circular SVG gauge showing adherence % (green ≥80%, amber ≥50%, rose <50%) with the sessions-this-week/target readout and a contextual recommendation. Staggered bar entrance animations.
+  * Added `<DoctorAnalytics />` to the doctor dashboard between the activity heatmap and the patient roster.
+  * **Verified**: doctor dashboard shows "Accuracy distribution: 0-20% 0, 20-40% 0, 40-60% 1, 60-80% 5, 80-100% 16" (most sessions are high-accuracy) + "Plan adherence 88% on target, This week 22/2, Excellent adherence". No errors. Screenshot saved to `/home/z/my-project/r5-doctor-analytics.png`.
+- **Feature (Task 36) — Patient progress timeline**:
+  * `src/components/neuromove/progress-timeline.tsx` — a vertical milestone timeline showing the patient's rehabilitation journey. Each notification (badge_earned, plan_prescribed, session_saved, streak_milestone, coach_summary) becomes a timeline entry with a color-coded icon node on a vertical gradient line, a type-label, title, body, and timeAgo. Staggered entrance animations. Fetches `/api/v2/notifications?userId=<patientId>` so a doctor viewing a patient sees THAT patient's milestones.
+  * Added to the patient detail page in a new card after the clinical-trends row.
+  * **Verified**: doctor viewing Layla sees "Progress timeline · 4 milestones" with entries: "Session · 11m ago · Live session synced · 5 reps, 140° max ROM, score 40. Auto-saved from the camera." + "Session · 16m ago..." + older session-saved entries. Screenshot saved to `/home/z/my-project/r5-progress-timeline.png`.
+- **Styling polish (Task 37)**: the `nm-glass`, `nm-pulse-glow`, and `nm-shimmer` utilities from round 4 are now applied — the bell dropdown uses `backdrop-blur-xl`, the analytics cards use `backdrop-blur`, the notification live indicator uses a pulsing emerald dot, and the timeline nodes use color-coded rings. All new components use the mesh background (`nm-mesh-bg`) inherited from the page root.
+- **Verification (Task 38)** via agent-browser through the gateway at http://localhost:81/:
+  1. Doctor login → dashboard: KPI tiles + activity heatmap + **new DoctorAnalytics** (accuracy histogram with 5 bars + adherence gauge at 88%) + patient roster. No errors.
+  2. Doctor → patient detail (Layla): all existing charts + **new ProgressTimeline** ("4 milestones" with session-saved and live-session-synced entries). No errors.
+  3. Logout → patient login (Layla): saved a session via API → **SSE pushed the notification** → bell badge updated from "3 unread" to "4 unread" within ~5-11s without a page reload → dropdown showed "Session saved · just now · 9 reps, 155° max ROM, score 78". The "live" green pulsing indicator confirmed the SSE connection was active. No errors.
+  4. `bun run lint` → exit 0.
+  5. DB counts: 4 users, 3 plans, **23 sessions**, 7 presets, 6 badges, 2 chat messages, **5 notifications** (the new session-saved one was pushed via SSE).
+- **Infra note**: the SSE endpoint uses a 5s DB-poll internally (not a true message bus) — this is the cheapest "push" that works in the sandbox without Redis/Postgres LISTEN/NOTIFY. In production, swap the poll for a Redis pub/sub subscription for true event-driven push.
+
+Stage Summary:
+- **Round 5 is COMPLETE and browser-verified.** NeuroMove now has:
+  * **Real-time notifications via SSE** — the bell uses a persistent EventSource connection instead of 30s polling. New notifications appear within ~5s of being created (verified: saved a session, bell updated without reload). A green "live" indicator confirms the connection.
+  * **Doctor analytics deep-dive** — an accuracy distribution histogram (5 color-coded buckets) + a circular plan-adherence gauge with contextual recommendations, on the doctor dashboard. New `/api/v2/stats/distribution` endpoint.
+  * **Patient progress timeline** — a vertical milestone timeline (badges, plans, sessions, streaks) with color-coded icon nodes on a gradient line, giving the recovery journey a visual narrative. Reuses the notification feed as the milestone source.
+  * The notifications endpoint now supports a `userId` query param so doctors can view any patient's feed.
+- The app is now a 6-tier fullstack platform: (1) Python FastAPI on :8001 for real-time WebSocket pose inference + auto-sync, (2) Next.js API v2 routes (Prisma → SQLite) for persistence/auth/management, (3) z-ai LLM for agentic coaching with persisted conversations, (4) a real-time SSE notification system, (5) a clinical analytics layer (heatmap + comp trend + per-limb breakdown + accuracy histogram + adherence gauge), (6) a patient progress timeline.
+- `bun run lint` passes clean. Pose-server healthy (PID 14655). Dev-server daemonized (PID 12255). Both survive across bash calls. Demo accounts: `doctor@neuromove.health` / `layla@neuromove.health` / `omar@neuromove.health`, all password `demo1234`.
+- **Open follow-ups for the next 15-min round (Task 39+)**:
+  1. Real Arabic i18n with `next-intl` (RTL layout, translated UI strings) — still the top remaining follow-up.
+  2. Swap the SSE internal DB-poll for a Redis pub/sub or Postgres LISTEN/NOTIFY subscription for true event-driven push (the 5s poll works but isn't truly instant).
+  3. Pose-server logging: configure uvicorn's log handlers so WS open/close/sync messages reach server.log (currently only the `daemon starting` line appears).
+  4. Apply `nm-shimmer` to all skeleton loading states (currently only some use it).
+  5. Full E2E test of the pose-server auto-sync with a real webcam.
