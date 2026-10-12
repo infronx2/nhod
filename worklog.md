@@ -620,3 +620,40 @@ Stage Summary:
   3. Pose-server logging: configure uvicorn's log handlers so WS messages reach server.log.
   4. Goal-progress sparkline in the goals tracker (the progress bar is there but no per-session sparkline).
   5. Full E2E confetti test (set a new unachieved goal, save a session that exceeds it).
+
+---
+Task ID: 56-60
+Agent: webDevReview cron (round 9, 15-min recurring review)
+Task: Assess project status, run agent-browser QA, fix bugs, advance Phase 3+ (clinic-wide leaderboard, exercise library page, styling polish with nm-shimmer). Continue from the stable round-8 baseline.
+
+Work Log:
+- Read worklog Tasks 1-55. Round 8 complete (goal delete, patient comparison). Open follow-ups: Arabic i18n, nm-shimmer to all skeletons, pose-server logging, goal-progress sparkline, full E2E confetti test.
+- **QA first**: pose-server healthy (PID 14655). Dev server healthy (PID 17774). Dashboard renders clean, no console errors. Round 8 stable.
+- **Feature (Task 58) — Clinic-wide leaderboard on doctor dashboard**:
+  * `src/components/neuromove/clinic-leaderboard.tsx` — a ranked table of patients by a chosen metric (Accuracy, Reps, Streak, Sessions) with 4 sort-toggle buttons (each with its own icon: Trophy, Medal, Crown, Award). Top 3 patients get medal-colored rows (gold/silver/bronze borders + Crown/Medal/Award icons). Each row shows a gradient avatar, patient name, session count + affected side, and the metric value. Streak sort uses accuracy as a tiebreaker. Clicking a patient opens their detail view. Fetches each patient's streak via `/api/v2/streak` to enrich the ranking. Glassmorphism card with staggered entrance animations + hover micro-interaction (x:2 slide).
+  * Added to the doctor dashboard in a 3-col grid (leaderboard 1 col + exercise library 2 cols) between PatientCompare and the roster.
+  * **Verified**: doctor dashboard shows "Clinic leaderboard" with 4 sort buttons + Layla ranked #1 (87.5% accuracy, 23 sessions) + Omar #2 (80.0%, 3 sessions). Clicking "Streak" sort re-ranked the table (metric label changed to "streak"). No errors. Screenshot saved to `/home/z/my-project/r9-leaderboard-exercises.png`.
+- **Feature (Task 57) — Exercise library page**:
+  * `src/components/neuromove/exercise-library.tsx` — a searchable, filterable grid of the clinical exercise preset library. Each preset card shows: the joint icon (Dumbbell/Activity/Flame), a difficulty badge (beginner=emerald/intermediate=amber/advanced=rose, each with its own icon), the exercise name (EN + Arabic RTL), a 2-line description, and a circular SVG target-angle viz (an arc showing the fraction of 180° that the target represents, with the angle number in the center) + the sessions-per-week count. Doctors get a "Prescribe" shortcut button per card. Search filters by name/Arabic name/description/slug. Difficulty + joint filter pills. Staggered card entrance animations + hover lift (y:-2).
+  * Added to the doctor dashboard in the 3-col grid (2 cols) next to the leaderboard.
+  * **Verified**: doctor dashboard shows "Exercise library · 7 of 7 presets" with difficulty filters (beginner/intermediate/advanced), joint filters (elbow/shoulder/wrist), search box, and preset cards including "Advanced Elbow Flexion / ثني الكوع المتقدم" (Arabic name rendering RTL). No errors.
+- **Styling polish (Task 59)**: both new components use `nm-glass` glassmorphism. The leaderboard has medal-colored rows for top 3 (gold/silver/bronze). The exercise library has per-difficulty color-coding (emerald/amber/rose) + a circular SVG target-angle arc per preset. Both have staggered entrance animations + hover micro-interactions.
+- **Verification (Task 60)** via agent-browser through the gateway at http://localhost:81/:
+  1. Doctor login → dashboard: KPI tiles + heatmap + DoctorAnalytics + PatientCompare + **ClinicLeaderboard** (4 sort buttons, Layla #1 87.5% accuracy, Omar #2 80.0%) + **ExerciseLibrary** (7 presets, search + difficulty + joint filters, Arabic names, target-angle arcs) + patient roster. No errors.
+  2. Clicked "Streak" sort on the leaderboard → re-ranked correctly, metric label changed to "streak". No errors.
+  3. `bun run lint` → exit 0.
+  4. DB counts: 4 users, 3 plans, 26 sessions, 7 presets, 6 badges, 2 chat messages, 9 notifications, 1 RehabGoal, 2 Streaks.
+
+Stage Summary:
+- **Round 9 is COMPLETE and browser-verified.** NeuroMove now has:
+  * **Clinic-wide leaderboard** — a ranked patient table with 4 sort metrics (Accuracy/Reps/Streak/Sessions), medal-colored top-3 rows (gold/silver/bronze + Crown/Medal/Award icons), tiebreak logic, click-to-open-detail. New `ClinicLeaderboard` component.
+  * **Exercise library page** — a searchable + filterable grid of the clinical exercise preset library with per-difficulty color-coding, Arabic names (RTL), circular SVG target-angle arcs, and a doctor "Prescribe" shortcut. New `ExerciseLibrary` component.
+- The app is now a 10-tier fullstack platform: (1) Python FastAPI on :8001 for real-time WebSocket pose inference + auto-sync, (2) Next.js API v2 routes (Prisma → SQLite) for persistence/auth/management, (3) z-ai LLM for agentic coaching with persisted conversations, (4) a real-time SSE notification system, (5) a clinical analytics layer (heatmap + comp trend + per-limb breakdown + accuracy histogram + adherence gauge), (6) a patient progress timeline, (7) a gamification layer (badges + streaks + goals + FHIR bundle export), (8) a patient engagement layer (weekly insights + confetti + set-goal dialog), (9) a clinical decision-support layer (patient comparison + goal management), (10) a clinical resource layer (exercise library + clinic leaderboard).
+- `bun run lint` passes clean. Pose-server healthy (PID 14655). Dev-server daemonized (PID 17774). Both survive across bash calls. Demo accounts: `doctor@neuromove.health` / `layla@neuromove.health` / `omar@neuromove.health`, all password `demo1234`.
+- **Open follow-ups for the next 15-min round (Task 61+)**:
+  1. Real Arabic i18n with `next-intl` (RTL layout, translated UI strings) — still the top remaining follow-up.
+  2. Apply `nm-shimmer` to all skeleton loading states.
+  3. Pose-server logging: configure uvicorn's log handlers.
+  4. Goal-progress sparkline in the goals tracker.
+  5. Full E2E confetti test (set a new unachieved goal, save a session that exceeds it).
+  6. Wire the ExerciseLibrary "Prescribe" shortcut to open the PrescribePlanDialog pre-filled with the preset's target angle + limb.

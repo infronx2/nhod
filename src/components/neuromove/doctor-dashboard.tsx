@@ -25,6 +25,8 @@ import { AnimatedKpi } from '@/components/neuromove/animated-kpi'
 import { ActivityHeatmap } from '@/components/neuromove/activity-heatmap'
 import { DoctorAnalytics } from '@/components/neuromove/doctor-analytics'
 import { PatientCompare } from '@/components/neuromove/patient-compare'
+import { ClinicLeaderboard } from '@/components/neuromove/clinic-leaderboard'
+import { ExerciseLibrary } from '@/components/neuromove/exercise-library'
 import { PatientDetail } from '@/components/neuromove/patient-detail'
 
 interface DoctorDashboardProps {
@@ -179,6 +181,16 @@ export function DoctorDashboard({ doctorId }: DoctorDashboardProps) {
 
       {/* ---------- Patient comparison (side-by-side) ---------- */}
       <PatientCompare patients={patients} />
+
+      {/* ---------- Clinic leaderboard + Exercise library ---------- */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <ClinicLeaderboard patients={patients} onPatientClick={(id) => setSelectedId(id)} />
+        </div>
+        <div className="lg:col-span-2">
+          <ExerciseLibrary />
+        </div>
+      </div>
 
       {/* ---------- Roster ---------- */}
       <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
