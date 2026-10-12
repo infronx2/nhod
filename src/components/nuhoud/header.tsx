@@ -4,6 +4,7 @@ import * as React from 'react'
 import { motion } from 'framer-motion'
 import { Moon, Sun, Languages, Wifi, WifiOff, Loader2 } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -15,8 +16,10 @@ import { useAuth } from '@/hooks/use-auth'
 interface HeaderProps {
   /** WS connection state. Omit / pass undefined to hide the WS pill entirely. */
   connection?: WsConnectionState
-  rtl: boolean
-  onToggleRtl: () => void
+  /** Legacy prop — kept for backward compatibility but no longer used. */
+  rtl?: boolean
+  /** Legacy callback — kept for backward compatibility but no longer used. */
+  onToggleRtl?: () => void
 }
 
 function NuhoudLogo({ className }: { className?: string }) {
@@ -29,16 +32,7 @@ function NuhoudLogo({ className }: { className?: string }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* outer ring — joint capsule */}
-      <circle
-        cx="32"
-        cy="32"
-        r="28"
-        stroke="currentColor"
-        strokeWidth="2"
-        opacity="0.25"
-      />
-      {/* dendrites */}
+      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="2" opacity="0.25" />
       <g stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.55">
         <path d="M32 4 L32 12" />
         <path d="M52 16 L46 21" />
@@ -49,16 +43,8 @@ function NuhoudLogo({ className }: { className?: string }) {
         <path d="M4 32 L12 32" />
         <path d="M12 16 L18 21" />
       </g>
-      {/* central soma */}
       <circle cx="32" cy="32" r="6" fill="currentColor" />
-      {/* elbow-joint accent arc */}
-      <path
-        d="M20 40 Q32 50 44 36"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        opacity="0.85"
-      />
+      <path d="M20 40 Q32 50 44 36" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.85" />
       <circle cx="20" cy="40" r="3" fill="currentColor" />
       <circle cx="44" cy="36" r="3" fill="currentColor" />
     </svg>
@@ -66,43 +52,65 @@ function NuhoudLogo({ className }: { className?: string }) {
 }
 
 /**
- * Header — شريط علوي ثابت. عند تسجيل الدخول نعرض خلفية متدرجة + قائمة المستخدم
- * مع أزرار تبديل اللغة والسمة. عند عدم تسجيل الدخول نعرض نسخة أبسط.
- *
- * الخلفية تستخدم تدرجاً داكناً مع توهج تيل خفيف خلف الشعار لإضفاء عمق بصري.
+ * Header — sticky top bar with brand, language toggle, theme toggle, WS
+ * status, notification bell, and user menu. Uses next-intl's useLocale +
+ * useTranslations for full Arabic/English bilingual support. The language
+ * toggle switches the locale cookie via /api/v2/locale then reloads.
  */
-export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
+export function Header({ connection, rtl: _rtl, onToggleRtl: _onToggleRtl }: HeaderProps = {}) {
   const { theme, setTheme } = useTheme()
   const { user } = useAuth()
+  const t = useTranslations('header')
+  const tc = useTranslations('common')
+  const locale = useLocale()
   const [mounted, setMounted] = React.useState(false)
+  const [switching, setSwitching] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
+
+  const isRTL = locale === 'ar'
 
   const statusColor: Record<WsConnectionState, string> = {
     Disconnected: 'bg-rose-500',
     Connecting: 'bg-amber-500',
     Connected: 'bg-emerald-500',
   }
-
   const statusLabel: Record<WsConnectionState, string> = {
-    Disconnected: 'غير متصل',
-    Connecting: 'جارٍ الاتصال',
-    Connected: 'متصل',
+    Disconnected: tc('disconnected'),
+    Connecting: tc('connecting'),
+    Connected: tc('connected'),
+  }
+
+  const handleToggleLanguage = async () => {
+    const newLocale = locale === 'ar' ? 'en' : 'ar'
+    setSwitching(true)
+    try {
+      await fetch('/api/v2/locale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale: newLocale }),
+      })
+      // Reload to apply the new locale + direction.
+      window.location.reload()
+    } catch {
+      setSwitching(false)
+    }
   }
 
   return (
     <header
       className={cn(
         'sticky top-0 z-40 w-full border-b border-border/60 backdrop-blur-md supports-[backdrop-filter]:bg-background/70',
-        // تدرج خفيف يعمل في الوضعين الفاتح والداكن
-        'bg-gradient-to-l from-slate-50 via-background to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950',
+        // Gradient — uses logical direction (to-l for RTL, to-r for LTR)
+        isRTL
+          ? 'bg-gradient-to-l from-slate-50 via-background to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950'
+          : 'bg-gradient-to-r from-slate-50 via-background to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950',
       )}
     >
-      {/* توهج تيل خلف الشعار */}
+      {/* Radial teal glow behind the logo — positioned on the start side */}
       <div
-        className="pointer-events-none absolute top-1/2 right-2 h-24 w-24 -translate-y-1/2 rounded-full opacity-40 blur-2xl sm:right-6"
+        className="pointer-events-none absolute top-1/2 h-24 w-24 -translate-y-1/2 rounded-full opacity-40 blur-2xl start-2 sm:start-6"
         style={{
-          background:
-            'radial-gradient(circle at center, rgba(20,184,166,0.45), transparent 70%)',
+          background: 'radial-gradient(circle at center, rgba(20,184,166,0.45), transparent 70%)',
         }}
         aria-hidden="true"
       />
@@ -119,41 +127,41 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
           </motion.div>
           <div className="flex flex-col">
             <span className="text-base font-bold tracking-tight text-foreground sm:text-lg">
-              نُهوض
+              {t('brandName')}
             </span>
             <span className="text-[10px] leading-tight text-muted-foreground sm:text-xs">
-              علاج رقمي · تأهيل الأطراف العلوية بعد السكتة · سلطنة عُمان
+              {t('brandSubtitle')}
             </span>
           </div>
         </div>
 
-        <div className="mr-auto flex items-center gap-2">
-          {/* إخفاء شارة اللغة عند تسجيل الدخول — قائمة المستخدم أهم */}
+        <div className="ms-auto flex items-center gap-2">
           {!user && (
             <Badge
               variant="outline"
-              className={cn(
-                'hidden gap-1.5 border-border/60 px-2.5 py-1 text-xs font-medium sm:inline-flex',
-              )}
-              aria-label={`اتجاه النص: ${rtl ? 'عربي RTL' : 'إنجليزي LTR'}`}
+              className="hidden gap-1.5 border-border/60 px-2.5 py-1 text-xs font-medium sm:inline-flex"
             >
-              <span className="text-foreground">
-                مرحباً بكم في نُهوض
-              </span>
+              <span className="text-foreground">{t('welcomeText')}</span>
             </Badge>
           )}
 
+          {/* Language toggle — switches between Arabic and English */}
           <Button
             variant="outline"
             size="sm"
-            onClick={onToggleRtl}
+            onClick={handleToggleLanguage}
+            disabled={switching}
             className="h-9 gap-1.5 px-3 text-xs"
-            aria-label="تبديل اللغة بين العربية والإنجليزية"
+            aria-label={t('toggleLanguage')}
           >
-            <Languages className="h-4 w-4" aria-hidden="true" />
-            <span>{rtl ? 'عربي' : 'EN'}</span>
+            {switching ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Languages className="h-4 w-4" aria-hidden="true" />
+            )}
+            <span>{isRTL ? 'EN' : 'عربي'}</span>
             <span className="text-muted-foreground">|</span>
-            <span className="text-muted-foreground">{rtl ? 'EN' : 'عربي'}</span>
+            <span className="text-muted-foreground">{isRTL ? 'عربي' : 'EN'}</span>
           </Button>
 
           <Button
@@ -161,7 +169,7 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
             size="icon"
             className="h-9 w-9"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            aria-label="تبديل الوضع الليلي"
+            aria-label={t('toggleDarkMode')}
           >
             {mounted ? (
               theme === 'dark' ? (
@@ -174,7 +182,6 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
             )}
           </Button>
 
-          {/* شارة حالة الاتصال — تظهر فقط عند توفير حالة الاتصال */}
           {user && connection && (
             <div
               className="hidden items-center gap-2 rounded-full border border-border/60 bg-card/40 px-3 py-1.5 text-xs font-medium md:inline-flex"
@@ -183,10 +190,7 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
             >
               <span className="relative inline-flex h-2.5 w-2.5">
                 <span
-                  className={cn(
-                    'inline-flex h-2.5 w-2.5 rounded-full',
-                    statusColor[connection],
-                  )}
+                  className={cn('inline-flex h-2.5 w-2.5 rounded-full', statusColor[connection])}
                 />
                 {connection === 'Connecting' && (
                   <span className="absolute inset-0 inline-flex h-2.5 w-2.5 animate-ping rounded-full bg-amber-500/60" />
@@ -204,7 +208,6 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
           )}
 
           {user && <NotificationBell />}
-
           {user && <UserMenu />}
         </div>
       </div>

@@ -33,6 +33,7 @@ import type {
 } from '@/lib/v2-types'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
+import { useTranslations, useLocale } from 'next-intl'
 
 /**
  * SectionLabel — small uppercase muted label used as a divider between
@@ -67,7 +68,11 @@ function SectionLabel({
  */
 function PatientDashboard() {
   const { user } = useAuth()
-  const [rtl] = React.useState(false)
+  const t = useTranslations('sections')
+  const tf = useTranslations('footer')
+  const tc = useTranslations('common')
+  const locale = useLocale()
+  const isRTL = locale === 'ar'
   const [goal, setGoal] = React.useState(20)
   const [snapshot, setSnapshot] = React.useState<TrackSnapshot>({
     mode: 'demo',
@@ -184,12 +189,6 @@ function PatientDashboard() {
     <div className="nm-mesh-bg flex min-h-screen flex-col bg-background">
       <Header
         connection={pose.connection}
-        rtl={rtl}
-        onToggleRtl={() => {
-          toast.info('تبديل اللغة', {
-            description: 'دعم اللغة العربية الكامل متاح الآن.',
-          })
-        }}
       />
 
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -207,7 +206,7 @@ function PatientDashboard() {
           />
         </motion.div>
 
-        <SectionLabel index="٠١">التتبع الحي</SectionLabel>
+        <SectionLabel index={isRTL ? '٠١' : '01'}>{t('liveTracking')}</SectionLabel>
         <TrackingPanel
           pose={pose}
           goal={goal}
@@ -216,7 +215,7 @@ function PatientDashboard() {
           onSessionSaved={onSessionSaved}
         />
 
-        <SectionLabel index="٠٢">التقدّم</SectionLabel>
+        <SectionLabel index={isRTL ? '٠٢' : '02'}>{t('progress')}</SectionLabel>
         {/* Streak badge row */}
         <div className="flex items-center justify-between gap-2">
           <StreakBadge />
@@ -237,10 +236,10 @@ function PatientDashboard() {
           </Card>
         </div>
 
-        <SectionLabel index="٠٣">تدفق البيانات الحي</SectionLabel>
+        <SectionLabel index={isRTL ? '٠٣' : '03'}>{t('jsonStream')}</SectionLabel>
         <JsonStream messages={pose.messageLog} onClear={pose.clearLog} />
 
-        <SectionLabel index="٠٤">سجلّ الجلسات</SectionLabel>
+        <SectionLabel index={isRTL ? '٠٤' : '04'}>{t('sessionHistory')}</SectionLabel>
         <SessionHistory
           currentSnapshot={{
             repCount: snapshot.repCount,
@@ -253,15 +252,15 @@ function PatientDashboard() {
           refreshSignal={sessionRefreshSignal}
         />
 
-        <SectionLabel index="٠٥">معمارية النظام</SectionLabel>
+        <SectionLabel index={isRTL ? '٠٥' : '05'}>{t('architecture')}</SectionLabel>
         <div id="architecture">
           <ArchitectureDiagram />
         </div>
 
-        <SectionLabel index="٠٦">الميكانيكا الحيوية</SectionLabel>
+        <SectionLabel index={isRTL ? '٠٦' : '06'}>{t('biomechanics')}</SectionLabel>
         <BiomechanicsExplainer />
 
-        <SectionLabel index="٠٧">دليل التكامل مع UE5</SectionLabel>
+        <SectionLabel index={isRTL ? '٠٧' : '07'}>{t('ue5Guide')}</SectionLabel>
         <ApiReference />
       </main>
 
@@ -275,7 +274,7 @@ function PatientDashboard() {
         headline={celebrationMsg?.headline}
         subheadline={celebrationMsg?.sub}
       />
-      <Footer rtl={rtl} />
+      <Footer rtl={isRTL} />
     </div>
   )
 }
@@ -288,24 +287,20 @@ function PatientDashboard() {
  */
 function DoctorView() {
   const { user } = useAuth()
-  const [rtl] = React.useState(false)
+  const t = useTranslations('sections')
+  const locale = useLocale()
+  const isRTL = locale === 'ar'
 
   return (
     <div className="nm-mesh-bg flex min-h-screen flex-col bg-background">
       <Header
-        rtl={rtl}
-        onToggleRtl={() => {
-          toast.info('تبديل اللغة', {
-            description: 'دعم اللغة العربية الكامل متاح الآن.',
-          })
-        }}
       />
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <SectionLabel index="٠١">لوحة الطبيب</SectionLabel>
+        <SectionLabel index={isRTL ? '٠١' : '01'}>{t('doctorDashboard')}</SectionLabel>
         {user && <DoctorDashboard doctorId={user.id} />}
       </main>
       <AgentChat variant="compact" />
-      <Footer rtl={rtl} />
+      <Footer rtl={isRTL} />
     </div>
   )
 }

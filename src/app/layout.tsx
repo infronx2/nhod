@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Cairo, Tajawal } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
-import messages from "../../messages/ar.json";
+import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/nuhoud/theme-provider";
@@ -67,12 +67,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+  const isRTL = locale === 'ar';
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang={locale} dir={isRTL ? 'rtl' : 'ltr'} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable} ${tajawal.variable} font-cairo antialiased bg-background text-foreground`}
       >
-        <NextIntlClientProvider locale="ar" messages={messages}>
+        <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -80,7 +83,7 @@ export default async function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            <SonnerToaster position="top-left" richColors closeButton dir="rtl" />
+            <SonnerToaster position={isRTL ? 'top-left' : 'top-right'} richColors closeButton dir={isRTL ? 'rtl' : 'ltr'} />
           </ThemeProvider>
         </NextIntlClientProvider>
       </body>

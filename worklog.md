@@ -752,3 +752,31 @@ Stage Summary:
 - **RTL + Cairo font + Tajawal mono** all active. Tailwind 4 logical properties (`ms-`, `ps-`, `pe-`, `to-l`) used in the example component.
 - **Bug fixed**: `createNextIntlPlugin` is a **default** export from `next-intl/plugin`, not a named export — `import createNextIntlPlugin from "next-intl/plugin"` (correct) vs `import { createNextIntlPlugin } from "next-intl/plugin"` (returns undefined, crashes the dev server).
 - `bun run lint` passes clean. All servers healthy and daemonized.
+
+---
+Task ID: 79
+Agent: Main orchestrator (Z.ai Code) — bilingual Arabic/English toggle
+Task: Make the language toggle button actually switch between Arabic and English, with full RTL/LTR layout flip. Previously the app was hardcoded to Arabic only.
+
+Work Log:
+- **Created `messages/en.json`** — complete English translation file with the same 22 namespaces as `ar.json` (~250 strings). All English equivalents: "Sign in", "Register", "Welcome back", "Live tracking", "Progress", "Doctor dashboard", etc.
+- **Updated `src/i18n/request.ts`** — now reads the locale from a cookie `nuhoud-locale` (default `ar`) via `next/headers` `cookies()`. Falls back to `ar` if no cookie. Supports both `ar` and `en`.
+- **Updated `src/app/layout.tsx`** — uses `getLocale()` + `getMessages()` from `next-intl/server` (dynamic, not hardcoded). Sets `<html lang={locale} dir={isRTL ? 'rtl' : 'ltr'}>` so the whole page flips direction based on the active locale. Sonner toaster position also flips (top-left for RTL, top-right for LTR).
+- **Created `src/app/api/v2/locale/route.ts`** — `POST /api/v2/locale` with `{locale: "ar"|"en"}`. Sets the `nuhoud-locale` cookie (httpOnly, 1-year expiry). The client then reloads the page to apply the new locale.
+- **Updated `src/components/nuhoud/header.tsx`** — uses `useLocale()` + `useTranslations('header')` + `useTranslations('common')`. The language toggle button now calls the locale API then `window.location.reload()`. Shows a spinner while switching. Uses logical Tailwind properties (`start-2`, `ms-auto`) for RTL/LTR agnosticism. Gradient direction flips (`to-l` for RTL, `to-r` for LTR).
+- **Updated `src/app/page.tsx`** — added `useTranslations('sections')` + `useLocale()`. All 7 SectionLabel titles now use `t('liveTracking')`, `t('progress')`, etc. Section indices use Arabic-Indic numerals (`٠١`-`٠٧`) in Arabic mode and Latin numerals (`01`-`07`) in English mode. Removed the old `rtl`/`onToggleRtl` state and toast — the Header handles language toggling internally now. `Footer rtl={isRTL}` still passed for backward compat but the Footer component itself now uses `useTranslations`.
+- **Updated `src/components/nuhoud/footer.tsx`** — uses `useTranslations('footer')` for all strings (phase, builtFor, backendHealth, phaseRoadmap, disclaimer, copyright). The `rtl` prop is now legacy/unused.
+- **Verified via agent-browser**:
+  1. **Arabic mode** (default): title "نُهوض — منصة تأهيل ما بعد السكتة الدماغية", `dir="rtl"`, `lang="ar"`, "تسجيل الدخول" ✅
+  2. **Toggle to English**: fetched `/api/v2/locale {locale:"en"}` → set cookie → `window.location.reload()` → `dir="ltr"`, `lang="en"`, "Nuhoud", "Sign in" ✅
+  3. **Toggle back to Arabic**: fetched `/api/v2/locale {locale:"ar"}` → reload → `dir="rtl"`, `lang="ar"`, "نُهوض", "تسجيل الدخول"` ✅
+  4. No console errors in either mode ✅
+  5. Screenshots saved: `lang-arabic-mode.png`, `lang-english-mode.png` ✅
+- `bun run lint` exit 0. All servers healthy.
+
+Stage Summary:
+- **The app now fully supports both Arabic (RTL) and English (LTR) with a working language toggle.**
+- **How it works**: the Header's language button POSTs to `/api/v2/locale` which sets the `nuhoud-locale` cookie → the page reloads → `next-intl`'s `getRequestConfig` reads the cookie → loads the appropriate `messages/ar.json` or `messages/en.json` → the `<html>` tag gets `dir="rtl"` or `dir="ltr"` accordingly → all `useTranslations` calls resolve in the active language → the layout flips.
+- **22 namespaces, ~500 total strings** (250 Arabic + 250 English) across `common`, `auth`, `header`, `footer`, `sections`, `tracking`, `commands`, `patient`, `doctor`, `sessions`, `goals`, `streaks`, `badges`, `notifications`, `coach`, `charts`, `timeline`, `weeklyInsights`, `exercises`, `fhir`, `replay`, `architecture`.
+- **Logical Tailwind properties** (`ms-auto`, `start-2`) used in the header so margins/positioning flip automatically with `dir`.
+- **Fonts**: Cairo (Arabic) + Tajawal (mono) + Geist (Latin fallback) all loaded — Cairo covers both Arabic and Latin glyphs so English text renders cleanly too.
