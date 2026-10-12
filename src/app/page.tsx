@@ -18,6 +18,8 @@ import { DoctorDashboard } from '@/components/neuromove/doctor-dashboard'
 import { PatientHeader } from '@/components/neuromove/patient-header'
 import { StreakBadge } from '@/components/neuromove/streak-badge'
 import { GoalsTracker } from '@/components/neuromove/goals-tracker'
+import { WeeklyInsights } from '@/components/neuromove/weekly-insights'
+import { ConfettiOverlay } from '@/components/neuromove/confetti-overlay'
 import { BadgesPanel } from '@/components/neuromove/badges-panel'
 import { ActivityChart } from '@/components/neuromove/activity-chart'
 import { AgentChat } from '@/components/neuromove/agent-chat'
@@ -80,6 +82,9 @@ function PatientDashboard() {
   })
   // Bumps whenever a session is saved so SessionHistory re-fetches.
   const [sessionRefreshSignal, setSessionRefreshSignal] = React.useState(0)
+  // Confetti celebration state — fires when a session save achieves a goal.
+  const [celebrate, setCelebrate] = React.useState(false)
+  const [celebrationMsg, setCelebrationMsg] = React.useState<{ headline: string; sub: string } | null>(null)
 
   // Patient detail (active plan + earned badges + sessions).
   const [detail, setDetail] = React.useState<V2PatientDetail | null>(null)
@@ -151,11 +156,23 @@ function PatientDashboard() {
     setSnapshot(s)
   }, [])
 
-  const onSessionSaved = React.useCallback(() => {
-    void fetchDetail()
-    void fetchStats()
-    setSessionRefreshSignal((n) => n + 1)
-  }, [fetchDetail, fetchStats])
+  const onSessionSaved = React.useCallback(
+    (goalAchievements?: Array<{ title: string; currentValue: number; targetValue: number }>) => {
+      void fetchDetail()
+      void fetchStats()
+      setSessionRefreshSignal((n) => n + 1)
+      // Fire confetti if a goal was achieved this session.
+      if (goalAchievements && goalAchievements.length > 0) {
+        const g = goalAchievements[0]
+        setCelebrationMsg({
+          headline: 'Goal achieved! 🎯',
+          sub: `${g.title} — reached ${g.currentValue}${g.targetValue >= 100 ? '°' : ''}`,
+        })
+        setCelebrate(true)
+      }
+    },
+    [fetchDetail, fetchStats],
+  )
 
   // Today's reps (from activity7d's last entry, if today exists).
   const todayReps = React.useMemo(() => {
@@ -206,6 +223,8 @@ function PatientDashboard() {
         </div>
         {/* Goals tracker (only renders if the patient has goals) */}
         <GoalsTracker />
+        {/* Weekly insights summary */}
+        <WeeklyInsights />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur">
             <ActivityChart data={stats?.activity7d ?? []} loading={statsLoading} />
@@ -247,6 +266,15 @@ function PatientDashboard() {
       </main>
 
       <AgentChat variant="compact" />
+      <ConfettiOverlay
+        active={celebrate}
+        onDone={() => {
+          setCelebrate(false)
+          setCelebrationMsg(null)
+        }}
+        headline={celebrationMsg?.headline}
+        subheadline={celebrationMsg?.sub}
+      />
       <Footer rtl={rtl} />
     </div>
   )

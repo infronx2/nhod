@@ -14,6 +14,7 @@ import {
   RotateCw,
   CalendarDays,
   Sparkles,
+  Target,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -50,6 +51,7 @@ import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import { AgentChat } from '@/components/neuromove/agent-chat'
 import { FhirBundleButton } from '@/components/neuromove/fhir-bundle-button'
+import { SetGoalDialog } from '@/components/neuromove/set-goal-dialog'
 import type {
   V2PatientDetail,
   V2Stats,
@@ -125,6 +127,7 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
   const [loading, setLoading] = React.useState(true)
   const [statsLoading, setStatsLoading] = React.useState(true)
   const [planDialogOpen, setPlanDialogOpen] = React.useState(false)
+  const [goalDialogOpen, setGoalDialogOpen] = React.useState(false)
   const [fhirSessionId, setFhirSessionId] = React.useState<string | null>(null)
   const [fhirOpen, setFhirOpen] = React.useState(false)
   const [coachOpen, setCoachOpen] = React.useState(false)
@@ -252,6 +255,15 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
           Refresh
         </Button>
         <FhirBundleButton patientId={patientId} patientName={detail?.patient.name} days={30} />
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-9 gap-1.5 border-amber-500/40 text-amber-600 hover:bg-amber-500/5 dark:text-amber-400"
+          onClick={() => setGoalDialogOpen(true)}
+        >
+          <Target className="h-3.5 w-3.5" />
+          Set goal
+        </Button>
         <Button
           size="sm"
           className={cn(
@@ -514,6 +526,17 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
           }}
         />
       )}
+
+      <SetGoalDialog
+        patientId={patientId}
+        patientName={detail?.patient.name}
+        open={goalDialogOpen}
+        onOpenChange={setGoalDialogOpen}
+        onCreated={() => {
+          void fetchDetail()
+          void fetchStats()
+        }}
+      />
     </div>
   )
 }

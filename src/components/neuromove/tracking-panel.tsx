@@ -42,8 +42,10 @@ interface TrackingPanelProps {
   /**
    * Optional callback invoked after a session is successfully persisted to
    * /api/v2/sessions. Parents can use this to refresh charts/history.
+   * Receives the saved session's goal achievements (if any) so the parent
+   * can fire a celebration.
    */
-  onSessionSaved?: () => void
+  onSessionSaved?: (goalAchievements?: Array<{ title: string; currentValue: number; targetValue: number }>) => void
 }
 
 export interface TrackSnapshot {
@@ -495,7 +497,11 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose, onSessio
       }
       // Clear the buffer so the next session starts fresh.
       angleTimelineRef.current = []
-      onSessionSaved?.()
+      // Pass goal achievements up so the parent can fire a celebration.
+      const goalAchievements = (data as any).goalAchievements as
+        | Array<{ title: string; currentValue: number; targetValue: number }>
+        | undefined
+      onSessionSaved?.(goalAchievements)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'unknown'
       toast.error('Save failed', { description: msg })
