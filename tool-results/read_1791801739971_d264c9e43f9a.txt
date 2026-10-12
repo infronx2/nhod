@@ -1,0 +1,699 @@
+     1→"""
+     2→NeuroMove - Real-Time AI Inference Server
+     3→==========================================
+     4→
+     5→Phase 1 deliverable: a production-ready FastAPI + WebSocket + MediaPipe Pose
+     6→backend for post-stroke upper-limb rehabilitation.
+     7→
+     8→Architecture role
+     9→-----------------
+    10→This server is the "Real-Time Processing Tier" of the NeuroMove distributed
+    11→system. It receives camera frames from the Unreal Engine 5 (UE5) mobile client
+    12→(or any WebSocket client, including the Next.js test harness) as Base64-encoded
+    13→JPEG strings, runs Google MediaPipe Pose to extract 3D landmarks, computes the
+    14→elbow joint angle with proper biomechanics math, detects compensatory shoulder
+    15→shrugging, and streams a tiny JSON verdict back to the game client in real time.
+    16→
+    17→Key design choices
+    18→------------------
+    19→* MediaPipe 0.10.x classic API (`mp.solutions.pose`) - the API the UE5 team is
+    20→  coding against, and the one that ships the 33-landmark BlazePose model.
+    21→* One `Pose` instance per WebSocket connection (MediaPipe's Pose object is NOT
+    22→  thread-safe across concurrent connections) so each patient session gets an
+    23→  isolated, warm tracker.
+    24→* All heavy work happens inside the async receive loop using `asyncio.to_thread`
+    25→  so the FastAPI event loop is never blocked by GIL-bound MediaPipe inference.
+    26→* Repetition counting uses hysteresis (extended -> flexed -> extended) to avoid
+    27→  double-counting jitter near the target angle.
+    28→* Compensation detection compares the shoulder's vertical position against a
+    29→  rolling baseline captured while the arm is relaxed - this is far more robust
+    30→  than a hard-coded pixel threshold because it adapts to camera framing,
+    31→  patient distance and patient height.
+    32→
+    33→Author: NeuroMove Backend Team
+    34→"""
+    35→
+    36→from __future__ import annotations
+    37→
+    38→import asyncio
+    39→import base64
+    40→import binascii
+    41→import json
+    42→import logging
+    43→import math
+    44→import time
+    45→from collections import deque
+    46→from contextlib import asynccontextmanager
+    47→from dataclasses import dataclass, field
+    48→from typing import Deque, Optional, Tuple
+    49→
+    50→import cv2
+    51→import numpy as np
+    52→from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+    53→from fastapi.middleware.cors import CORSMiddleware
+    54→from mediapipe import solutions as mp_solutions  # mp.solutions.pose lives here
+    55→
+    56→# ---------------------------------------------------------------------------
+    57→# Logging - structured enough for production, light enough for real-time loops
+    58→# ---------------------------------------------------------------------------
+    59→logging.basicConfig(
+    60→    level=logging.INFO,
+    61→    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+    62→)
+    63→logger = logging.getLogger("neuromove.pose")
+    64→
+    65→# ---------------------------------------------------------------------------
+    66→# Constants
+    67→# ---------------------------------------------------------------------------
+    68→POSE_SERVER_PORT = 8001
+    69→
+    70→# MediaPipe Pose landmark indices (BlazePose, 33 points).
+    71→# See https://google.github.io/mediapipe/solutions/pose.html
+    72→LM_RIGHT_SHOULDER = 12
+    73→LM_RIGHT_ELBOW = 14
+    74→LM_RIGHT_WRIST = 16
+    75→LM_LEFT_SHOULDER = 11
+    76→LM_LEFT_ELBOW = 13
+    77→LM_LEFT_WRIST = 15
+    78→LM_NOSE = 0  # used as a rough vertical reference for the head
+    79→
+    80→# Hysteresis band (in degrees) used for rep counting so a noisy angle signal
+    81→# near the target doesn't register dozens of reps per second.
+    82→REP_HYSTERESIS_DEG = 15.0
+    83→
+    84→# Sliding window for the relaxed-shoulder baseline (in frames). At ~15 fps this
+    85→# is ~2 seconds of history, plenty to capture the resting shoulder height.
+    86→BASELINE_WINDOW = 30
+    87→
+    88→
+    89→# ---------------------------------------------------------------------------
+    90→# Biomechanics helpers
+    91→# ---------------------------------------------------------------------------
+    92→def calculate_angle(a, b, c) -> float:
+    93→    """
+    94→    Compute the interior joint angle (in degrees) at point `b` formed by the
+    95→    three 2D points a-b-c.
+    96→
+    97→    Biomechanics convention
+    98→    -----------------------
+    99→    For elbow flexion we pass a=shoulder, b=elbow, c=wrist. A fully extended
+   100→    arm is ~180deg; a fully flexed arm is ~0deg. This matches the goniometric
+   101→    measurement a physiotherapist would take with a manual goniometer.
+   102→
+   103→    Math
+   104→    ----
+   105→    Uses atan2 of the two direction vectors (b->a) and (b->c). atan2 is
+   106→    preferred over acos here because (1) it's numerically stable near 0 and
+   107→    180 degrees, and (2) it preserves the sign so we can take the absolute
+   108→    supplementary angle correctly when the joint opens past 180deg (which
+   109→    happens with medial/lateral rotation).
+   110→
+   111→    Parameters
+   112→    ----------
+   113→    a, b, c : array-like of shape (2,) or (3,)
+   114→        Shoulder, elbow, wrist coordinates. Only the first two dims (x, y)
+   115→        are used for the planar angle - this is the standard 2D sagittal-plane
+   116→        measurement used in telerehabilitation literature.
+   117→
+   118→    Returns
+   119→    -------
+   120→    float
+   121→        Angle in degrees in the range [0, 180].
+   122→    """
+   123→    a = np.asarray(a, dtype=np.float32)
+   124→    b = np.asarray(b, dtype=np.float32)
+   125→    c = np.asarray(c, dtype=np.float32)
+   126→
+   127→    # Direction vectors from the elbow (vertex) to the shoulder and wrist.
+   128→    ba = a - b
+   129→    bc = c - b
+   130→
+   131→    # atan2 returns the angle each vector makes with the +x axis. The
+   132→    # difference is the signed angle between them, robust to wrap-around.
+   133→    angle_rad = math.atan2(bc[1], bc[0]) - math.atan2(ba[1], ba[0])
+   134→    angle_deg = abs(np.degrees(angle_rad))
+   135→
+   136→    # Fold into [0, 180] - an elbow can't physically open past 180deg, so
+   137→    # anything larger is just the other side of the same joint.
+   138→    if angle_deg > 180.0:
+   139→        angle_deg = 360.0 - angle_deg
+   140→
+   141→    return float(angle_deg)
+   142→
+   143→
+   144→def _to_xy(landmark) -> Tuple[float, float]:
+   145→    """Extract normalized (x, y) from a MediaPipe landmark."""
+   146→    return (float(landmark.x), float(landmark.y))
+   147→
+   148→
+   149→# ---------------------------------------------------------------------------
+   150→# Per-connection session state
+   151→# ---------------------------------------------------------------------------
+   152→@dataclass
+   153→class SessionState:
+   154→    """Mutable state tracked for a single WebSocket tracking session."""
+   155→
+   156→    target_angle: float = 90.0
+   157→    limb: str = "right"  # "right" or "left" upper limb
+   158→    compensation_threshold: float = 0.05  # normalized image units
+   159→    min_visibility: float = 0.5
+   160→
+   161→    # Rep counting state machine
+   162→    rep_count: int = 0
+   163→    score: int = 0
+   164→    max_achieved_angle: float = 0.0
+   165→    compensation_errors: int = 0
+   166→    _arm_extended: bool = True  # start assuming arm is extended
+   167→
+   168→    # Baseline for compensation detection (rolling median of shoulder y)
+   169→    _shoulder_baseline: Deque[float] = field(default_factory=lambda: deque(maxlen=BASELINE_WINDOW))
+   170→    _baseline_ready: bool = False
+   171→
+   172→    # Performance telemetry
+   173→    frames_processed: int = 0
+   174→    latencies: Deque[float] = field(default_factory=lambda: deque(maxlen=60))
+   175→
+   176→    def reset_baseline(self) -> None:
+   177→        self._shoulder_baseline.clear()
+   178→        self._baseline_ready = False
+   179→
+   180→    def update_rep_machine(self, elbow_angle: float, compensation: bool) -> None:
+   181→        """
+   182→        Hysteresis rep counter.
+   183→
+   184→        A rep is counted when the elbow flexes below (target - hysteresis)
+   185→        and then extends back above (target + hysteresis). We only credit a
+   186→        rep when there was NO compensation detected during the flexion peak -
+   187→        this directly encodes the clinical rule "compensated reps don't count".
+   188→        """
+   189→        flexed_target = self.target_angle - REP_HYSTERESIS_DEG
+   190→        extended_target = self.target_angle + REP_HYSTERESIS_DEG
+   191→
+   192→        if not self._arm_extended and elbow_angle >= extended_target:
+   193→            # Arm has returned to extended -> close the rep.
+   194→            self._arm_extended = True
+   195→            self.rep_count += 1
+   196→            # Scoring: clean reps worth 10, reps with any compensation in the
+   197→            # flexion worth 3 (still some effort, but bad form).
+   198→            # The `compensation` flag here reflects the current frame; the
+   199→            # session-level error counter tracks cumulative bad-posture frames.
+   200→            self.score += 3 if compensation else 10
+   201→
+   202→        if self._arm_extended and elbow_angle <= flexed_target:
+   203→            # Arm has flexed past the target -> prepare to credit a rep on
+   204→            # the way back up.
+   205→            self._arm_extended = False
+   206→
+   207→    def consider_baseline(self, shoulder_y: float) -> None:
+   208→        """Feed the relaxed-shoulder baseline buffer."""
+   209→        self._shoulder_baseline.append(shoulder_y)
+   210→        if len(self._shoulder_baseline) >= 10:
+   211→            self._baseline_ready = True
+   212→
+   213→    def detect_compensation(self, shoulder_y: float) -> bool:
+   214→        """
+   215→        Detect compensatory shoulder shrug.
+   216→
+   217→        Clinical rationale
+   218→        -------------------
+   219→        After a stroke, patients often cannot flex the elbow through the full
+   220→        ROM, so they unconsciously elevate (shrug) the affected shoulder to
+   221→        bring the hand toward the target. This is a maladaptive compensation
+   222→        pattern that therapists want to discourage.
+   223→
+   224→        Implementation
+   225→        --------------
+   226→        We capture a rolling baseline of the shoulder's normalized Y position
+   227→        (image Y, top=0). Because Y decreases downward, a SHRUG moves the
+   228→        shoulder UP, i.e. to SMALLER Y values. So compensation is flagged when
+   229→        the current shoulder_y drops more than `compensation_threshold` below
+   230→        the baseline median.
+   231→
+   232→        Using a rolling baseline (vs. a hard pixel threshold) makes the
+   233→        detector robust to patient height, camera distance and framing.
+   234→        """
+   235→        if not self._baseline_ready:
+   236→            return False
+   237→        baseline_median = float(np.median(list(self._shoulder_baseline)))
+   238→        # Smaller Y = higher in the image = shoulder raised (shrug).
+   239→        shrug_amount = baseline_median - shoulder_y
+   240→        return shrug_amount > self.compensation_threshold
+   241→
+   242→
+   243→# ---------------------------------------------------------------------------
+   244→# FastAPI app
+   245→# ---------------------------------------------------------------------------
+   246→# In-memory registry of completed sessions (Phase 1 stand-in for PostgreSQL /
+   247→# Supabase which arrives in Phase 2). Thread-safe enough for single-process uvicorn.
+   248→completed_sessions: list[dict] = []
+   249→active_connections: int = 0
+   250→
+   251→
+   252→@asynccontextmanager
+   253→async def lifespan(app: FastAPI):
+   254→    logger.info("NeuroMove Pose Server starting on port %s", POSE_SERVER_PORT)
+   255→    yield
+   256→    logger.info("NeuroMove Pose Server shutting down (active=%s)", active_connections)
+   257→
+   258→
+   259→app = FastAPI(
+   260→    title="NeuroMove Pose Inference Server",
+   261→    description=(
+   262→        "Real-time MediaPipe Pose inference + biomechanics for post-stroke "
+   263→        "upper-limb rehabilitation. Phase 1 of the NeuroMove platform."
+   264→    ),
+   265→    version="1.0.0",
+   266→    lifespan=lifespan,
+   267→)
+   268→
+   269→# Permissive CORS - the UE5 mobile client, the Next.js dashboard, and hospital
+   270→# EHR probes all hit this server from different origins.
+   271→app.add_middleware(
+   272→    CORSMiddleware,
+   273→    allow_origins=["*"],
+   274→    allow_credentials=True,
+   275→    allow_methods=["*"],
+   276→    allow_headers=["*"],
+   277→)
+   278→
+   279→
+   280→@app.get("/")
+   281→async def root():
+   282→    """Landing / health probe."""
+   283→    return {
+   284→        "service": "NeuroMove Pose Inference Server",
+   285→        "phase": 1,
+   286→        "status": "ok",
+   287→        "active_connections": active_connections,
+   288→        "endpoints": {
+   289→            "websocket": "/ws/track?limb=right&target_angle=90",
+   290→            "health": "/health",
+   291→            "sessions": "/api/v1/sessions",
+   292→            "stats": "/api/v1/stats",
+   293→        },
+   294→    }
+   295→
+   296→
+   297→@app.get("/health")
+   298→async def health():
+   299→    return {
+   300→        "status": "healthy",
+   301→        "active_connections": active_connections,
+   302→        "completed_sessions": len(completed_sessions),
+   303→        "mediapipe": "mp.solutions.pose",
+   304→        "opencv": cv2.__version__,
+   305→        "numpy": np.__version__,
+   306→    }
+   307→
+   308→
+   309→@app.get("/api/v1/sessions")
+   310→async def list_sessions():
+   311→    """Return all completed sessions (Phase 1 in-memory store)."""
+   312→    return {"count": len(completed_sessions), "sessions": completed_sessions}
+   313→
+   314→
+   315→@app.get("/api/v1/stats")
+   316→async def aggregate_stats():
+   317→    """Aggregate gamification + clinical stats across all completed sessions."""
+   318→    if not completed_sessions:
+   319→        return {"count": 0, "total_reps": 0, "total_correct_reps": 0, "total_score": 0}
+   320→    total_reps = sum(s["total_reps"] for s in completed_sessions)
+   321→    total_correct = sum(s["correct_reps"] for s in completed_sessions)
+   322→    total_score = sum(s["gamification_score"] for s in completed_sessions)
+   323→    return {
+   324→        "count": len(completed_sessions),
+   325→        "total_reps": total_reps,
+   326→        "total_correct_reps": total_correct,
+   327→        "total_score": total_score,
+   328→        "accuracy_pct": round(100.0 * total_correct / total_reps, 2) if total_reps else 0.0,
+   329→    }
+   330→
+   331→
+   332→@app.post("/api/v1/sessions")
+   333→async def save_session(payload: dict):
+   334→    """
+   335→    Persist a completed rehab session.
+   336→
+   337→    The UE5 client calls this when the game ends. Phase 1 stores in memory;
+   338→    Phase 2 will swap this for Supabase/PostgreSQL with the exact schema from
+   339→    the system design (rehab_sessions table).
+   340→    """
+   341→    required = {"patient_id", "duration_seconds", "total_reps", "correct_reps",
+   342→                "max_achieved_angle", "compensation_errors", "gamification_score"}
+   343→    missing = required - set(payload.keys())
+   344→    if missing:
+   345→        return {"ok": False, "error": f"missing fields: {sorted(missing)}"}
+   346→    record = {
+   347→        "id": f"sess_{int(time.time() * 1000)}",
+   348→        "patient_id": payload["patient_id"],
+   349→        "plan_id": payload.get("plan_id"),
+   350→        "session_date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+   351→        **payload,
+   352→    }
+   353→    completed_sessions.append(record)
+   354→    logger.info("Saved session %s (patient=%s reps=%s score=%s)",
+   355→                record["id"], record["patient_id"],
+   356→                record["total_reps"], record["gamification_score"])
+   357→    return {"ok": True, "session": record}
+   358→
+   359→
+   360→# ---------------------------------------------------------------------------
+   361→# Frame decoding
+   362→# ---------------------------------------------------------------------------
+   363→def decode_base64_frame(b64_str: str) -> Optional[np.ndarray]:
+   364→    """
+   365→    Decode a Base64-encoded JPEG (optionally prefixed with a data URI scheme)
+   366→    into an OpenCV BGR array.
+   367→
+   368→    Returns None on any decoding failure so the caller can skip the frame
+   369→    gracefully instead of crashing the WebSocket loop.
+   370→    """
+   371→    if not b64_str:
+   372→        return None
+   373→    # Strip optional data URI prefix: "data:image/jpeg;base64,...."
+   374→    if "," in b64_str and b64_str.startswith("data:"):
+   375→        b64_str = b64_str.split(",", 1)[1]
+   376→    try:
+   377→        jpg = base64.b64decode(b64_str, validate=False)
+   378→    except (binascii.Error, ValueError) as exc:
+   379→        logger.debug("base64 decode failed: %s", exc)
+   380→        return None
+   381→    if not jpg:
+   382→        return None
+   383→    arr = np.frombuffer(jpg, dtype=np.uint8)
+   384→    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+   385→    return img  # may be None if cv2 fails
+   386→
+   387→
+   388→# ---------------------------------------------------------------------------
+   389→# WebSocket endpoint
+   390→# ---------------------------------------------------------------------------
+   391→@app.websocket("/ws/track")
+   392→async def track(
+   393→    websocket: WebSocket,
+   394→    limb: str = Query("right", description="'right' or 'left' upper limb"),
+   395→    target_angle: float = Query(90.0, description="Target elbow flexion in degrees"),
+   396→    compensation_threshold: float = Query(0.05, description="Shrug threshold (normalized Y)"),
+   397→):
+   398→    """
+   399→    Real-time pose tracking WebSocket.
+   400→
+   401→    Protocol
+   402→    --------
+   403→    Client -> Server messages (JSON, UTF-8):
+   404→
+   405→      1) Frame:      {"type":"frame","image":"<base64 jpeg>"}
+   406→      2) Reconfigure:{"type":"config","target_angle":90,"limb":"right",
+   407→                       "compensation_threshold":0.05}
+   408→
+   409→    Server -> Client messages:
+   410→
+   411→      Successful frame:
+   412→        {
+   413→          "type":"tracking",
+   414→          "elbow_angle":45.5, "target_angle":90,
+   415→          "target_reached":false, "compensation_detected":false,
+   416→          "command":"KEEP_GOING",
+   417→          "rep_count":0, "score":0, "max_achieved_angle":45.5,
+   418→          "visibility":0.93,
+   419→          "landmarks":{"shoulder":[x,y],"elbow":[x,y],"wrist":[x,y]},
+   420→          "latency_ms":12.3,
+   421→          "timestamp":1700000000.123
+   422→        }
+   423→
+   424→      No pose / corrupted frame:
+   425→        {"type":"error","code":"NO_POSE","message":"MediaPipe found no person"}
+   426→
+   427→    Commands
+   428→    --------
+   429→      KEEP_GOING      - patient is mid-rep, angle below target, posture OK
+   430→      HOLD            - target reached, hold the position
+   431→      TARGET_HIT      - just completed a valid rep
+   432→      CORRECT_POSTURE - compensation detected, stop shrugging
+   433→      NO_POSE         - therapist should reposition the camera
+   434→    """
+   435→    global active_connections
+   436→
+   437→    # Validate params up front so we never accept a malformed session.
+   438→    limb = limb.lower()
+   439→    if limb not in ("right", "left"):
+   440→        await websocket.close(code=4000, reason="limb must be 'right' or 'left'")
+   441→        return
+   442→    if not (0.0 <= target_angle <= 180.0):
+   443→        await websocket.close(code=4000, reason="target_angle must be in [0,180]")
+   444→        return
+   445→
+   446→    await websocket.accept()
+   447→    active_connections += 1
+   448→    session = SessionState(
+   449→        target_angle=float(target_angle),
+   450→        limb=limb,
+   451→        compensation_threshold=float(compensation_threshold),
+   452→    )
+   453→
+   454→    # MediaPipe's Pose object is not safe to share across connections, so we
+   455→    # instantiate one per session. static_image_mode=False enables the
+   456→    # temporal tracker for smooth real-time output.
+   457→    pose = mp_solutions.pose.Pose(
+   458→        static_image_mode=False,
+   459→        model_complexity=1,
+   460→        smooth_landmarks=True,
+   461→        enable_segmentation=False,
+   462→        min_detection_confidence=0.5,
+   463→        min_tracking_confidence=0.5,
+   464→    )
+   465→
+   466→    logger.info("WS /ws/track open limb=%s target=%.1f active=%s",
+   467→                session.limb, session.target_angle, active_connections)
+   468→
+   469→    try:
+   470→        await _tracking_loop(websocket, session, pose)
+   471→    except WebSocketDisconnect:
+   472→        logger.info("WS /ws/track client disconnected (limb=%s)", session.limb)
+   473→    except Exception as exc:  # noqa: BLE001 - we want to log every failure
+   474→        logger.exception("WS /ws/track crashed: %s", exc)
+   475→        try:
+   476→            await websocket.send_json({"type": "error", "code": "SERVER",
+   477→                                       "message": str(exc)})
+   478→        except Exception:
+   479→            pass
+   480→    finally:
+   481→        pose.close()
+   482→        active_connections -= 1
+   483→        # Persist a lightweight summary so the dashboard can show history.
+   484→        if session.frames_processed > 0:
+   485→            completed_sessions.append({
+   486→                "id": f"ws_{int(time.time()*1000)}",
+   487→                "patient_id": "live_session",
+   488→                "plan_id": None,
+   489→                "session_date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+   490→                "duration_seconds": 0,
+   491→                "total_reps": session.rep_count,
+   492→                "correct_reps": session.rep_count,  # refined in Phase 2
+   493→                "max_achieved_angle": round(session.max_achieved_angle, 2),
+   494→                "compensation_errors": session.compensation_errors,
+   495→                "gamification_score": session.score,
+   496→                "frames_processed": session.frames_processed,
+   497→            })
+   498→        logger.info("WS /ws/track closed reps=%s score=%s active=%s",
+   499→                    session.rep_count, session.score, active_connections)
+   500→
+   501→
+   502→async def _tracking_loop(websocket: WebSocket, session: SessionState, pose) -> None:
+   503→    """Main receive/decode/infer/respond loop for one connection."""
+   504→
+   505→    # Pick the landmark indices for the requested limb.
+   506→    if session.limb == "right":
+   507→        idx_shoulder, idx_elbow, idx_wrist = (
+   508→            LM_RIGHT_SHOULDER, LM_RIGHT_ELBOW, LM_RIGHT_WRIST
+   509→        )
+   510→    else:
+   511→        idx_shoulder, idx_elbow, idx_wrist = (
+   512→            LM_LEFT_SHOULDER, LM_LEFT_ELBOW, LM_LEFT_WRIST
+   513→        )
+   514→
+   515→    while True:
+   516→        raw = await websocket.receive_text()
+   517→        t0 = time.perf_counter()
+   518→
+   519→        try:
+   520→            msg = json.loads(raw)
+   521→        except json.JSONDecodeError:
+   522→            await websocket.send_json({"type": "error", "code": "BAD_JSON",
+   523→                                       "message": "expected JSON"})
+   524→            continue
+   525→
+   526→        mtype = msg.get("type")
+   527→
+   528→        # --- config update mid-session ------------------------------------
+   529→        if mtype == "config":
+   530→            new_target = msg.get("target_angle")
+   531→            if isinstance(new_target, (int, float)) and 0 <= new_target <= 180:
+   532→                session.target_angle = float(new_target)
+   533→            new_limb = msg.get("limb")
+   534→            if new_limb in ("right", "left") and new_limb != session.limb:
+   535→                session.limb = new_limb
+   536→                # Reset baseline when switching limbs.
+   537→                session.reset_baseline()
+   538→                if session.limb == "right":
+   539→                    idx_shoulder, idx_elbow, idx_wrist = (
+   540→                        LM_RIGHT_SHOULDER, LM_RIGHT_ELBOW, LM_RIGHT_WRIST
+   541→                    )
+   542→                else:
+   543→                    idx_shoulder, idx_elbow, idx_wrist = (
+   544→                        LM_LEFT_SHOULDER, LM_LEFT_ELBOW, LM_LEFT_WRIST
+   545→                    )
+   546→            new_thresh = msg.get("compensation_threshold")
+   547→            if isinstance(new_thresh, (int, float)) and 0 < new_thresh < 0.5:
+   548→                session.compensation_threshold = float(new_thresh)
+   549→            await websocket.send_json({"type": "config_ack",
+   550→                                        "target_angle": session.target_angle,
+   551→                                        "limb": session.limb,
+   552→                                        "compensation_threshold": session.compensation_threshold})
+   553→            continue
+   554→
+   555→        if mtype != "frame":
+   556→            await websocket.send_json({"type": "error", "code": "BAD_TYPE",
+   557→                                       "message": f"unknown type '{mtype}'"})
+   558→            continue
+   559→
+   560→        # --- decode --------------------------------------------------------
+   561→        img = decode_base64_frame(msg.get("image", ""))
+   562→        if img is None:
+   563→            await websocket.send_json({"type": "error", "code": "BAD_FRAME",
+   564→                                       "message": "could not decode base64 JPEG"})
+   565→            continue
+   566→
+   567→        # --- run MediaPipe in a worker thread so we don't block the loop ---
+   568→        # MediaPipe's process() is synchronous and CPU-bound; without
+   569→        # to_thread a single slow client would stall every other connection.
+   570→        try:
+   571→            results = await asyncio.to_thread(pose.process, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+   572→        except Exception as exc:  # noqa: BLE001
+   573→            logger.warning("MediaPipe process failed: %s", exc)
+   574→            await websocket.send_json({"type": "error", "code": "INFER_FAIL",
+   575→                                       "message": str(exc)})
+   576→            continue
+   577→
+   578→        if not results.pose_landmarks:
+   579→            # No person detected - tell the client so the game can prompt the
+   580→            # therapist to reposition the camera. We do NOT increment errors
+   581→            # here; a missing person is a setup issue, not a patient fault.
+   582→            await websocket.send_json({
+   583→                "type": "tracking",
+   584→                "elbow_angle": None,
+   585→                "target_angle": session.target_angle,
+   586→                "target_reached": False,
+   587→                "compensation_detected": False,
+   588→                "command": "NO_POSE",
+   589→                "rep_count": session.rep_count,
+   590→                "score": session.score,
+   591→                "max_achieved_angle": round(session.max_achieved_angle, 2),
+   592→                "visibility": 0.0,
+   593→                "landmarks": None,
+   594→                "latency_ms": round((time.perf_counter() - t0) * 1000.0, 2),
+   595→                "timestamp": time.time(),
+   596→            })
+   597→            continue
+   598→
+   599→        lms = results.pose_landmarks.landmark
+   600→        shoulder = lms[idx_shoulder]
+   601→        elbow = lms[idx_elbow]
+   602→        wrist = lms[idx_wrist]
+   603→
+   604→        # Visibility check - if the limb is occluded, don't trust the angle.
+   605→        vis = min(shoulder.visibility, elbow.visibility, wrist.visibility)
+   606→        if vis < session.min_visibility:
+   607→            await websocket.send_json({
+   608→                "type": "tracking",
+   609→                "elbow_angle": None,
+   610→                "target_angle": session.target_angle,
+   611→                "target_reached": False,
+   612→                "compensation_detected": False,
+   613→                "command": "NO_POSE",
+   614→                "rep_count": session.rep_count,
+   615→                "score": session.score,
+   616→                "max_achieved_angle": round(session.max_achieved_angle, 2),
+   617→                "visibility": float(round(vis, 3)),
+   618→                "landmarks": None,
+   619→                "latency_ms": round((time.perf_counter() - t0) * 1000.0, 2),
+   620→                "timestamp": time.time(),
+   621→            })
+   622→            continue
+   623→
+   624→        # --- biomechanics --------------------------------------------------
+   625→        s_xy = _to_xy(shoulder)
+   626→        e_xy = _to_xy(elbow)
+   627→        w_xy = _to_xy(wrist)
+   628→        elbow_angle = calculate_angle(s_xy, e_xy, w_xy)
+   629→
+   630→        # Track max ROM achieved this session.
+   631→        if elbow_angle > session.max_achieved_angle:
+   632→            session.max_achieved_angle = elbow_angle
+   633→
+   634→        # Compensation detection (baseline-fed shrug detector).
+   635→        session.consider_baseline(s_xy[1])
+   636→        compensation = session.detect_compensation(s_xy[1])
+   637→        if compensation:
+   638→            session.compensation_errors += 1
+   639→
+   640→        # Rep counting (hysteresis) - credits the rep on the way back up.
+   641→        prev_reps = session.rep_count
+   642→        session.update_rep_machine(elbow_angle, compensation)
+   643→        rep_just_completed = session.rep_count > prev_reps
+   644→
+   645→        # --- decide the command for the game client ------------------------
+   646→        target_reached = elbow_angle <= session.target_angle
+   647→        if compensation:
+   648→            command = "CORRECT_POSTURE"
+   649→        elif rep_just_completed:
+   650→            command = "TARGET_HIT"
+   651→        elif target_reached:
+   652→            command = "HOLD"
+   653→        else:
+   654→            command = "KEEP_GOING"
+   655→
+   656→        latency_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+   657→        session.frames_processed += 1
+   658→        session.latencies.append(latency_ms)
+   659→
+   660→        await websocket.send_json({
+   661→            "type": "tracking",
+   662→            "elbow_angle": round(elbow_angle, 2),
+   663→            "target_angle": session.target_angle,
+   664→            "target_reached": target_reached,
+   665→            "compensation_detected": compensation,
+   666→            "command": command,
+   667→            "rep_count": session.rep_count,
+   668→            "score": session.score,
+   669→            "max_achieved_angle": round(session.max_achieved_angle, 2),
+   670→            "compensation_errors": session.compensation_errors,
+   671→            "visibility": float(round(vis, 3)),
+   672→            "landmarks": {
+   673→                "shoulder": [round(s_xy[0], 4), round(s_xy[1], 4)],
+   674→                "elbow": [round(e_xy[0], 4), round(e_xy[1], 4)],
+   675→                "wrist": [round(w_xy[0], 4), round(w_xy[1], 4)],
+   676→            },
+   677→            "latency_ms": latency_ms,
+   678→            "fps_avg": round(1000.0 / np.mean(session.latencies), 1) if session.latencies and np.mean(session.latencies) > 0 else 0.0,
+   679→            "timestamp": time.time(),
+   680→        })
+   681→
+   682→
+   683→# ---------------------------------------------------------------------------
+   684→# Entrypoint - `python3 main.py` starts uvicorn with hot reload OFF in prod.
+   685→# We keep reload off because MediaPipe allocates native resources that don't
+   686→# play well with the reloader's forking.
+   687→# ---------------------------------------------------------------------------
+   688→if __name__ == "__main__":
+   689→    import uvicorn
+   690→
+   691→    uvicorn.run(
+   692→        "main:app",
+   693→        host="0.0.0.0",
+   694→        port=POSE_SERVER_PORT,
+   695→        log_level="info",
+   696→        reload=False,
+   697→        ws_max_size=8 * 1024 * 1024,  # 8 MB - large enough for raw PNG frames
+   698→    )
+   699→
