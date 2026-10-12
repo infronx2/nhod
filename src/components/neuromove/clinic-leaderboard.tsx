@@ -150,7 +150,7 @@ export function ClinicLeaderboard({ patients, onPatientClick }: ClinicLeaderboar
           {sorted.map((e, i) => {
             const rank = i
             const rankStyle = rank < 3 ? RANK_STYLES[rank] : 'border-border/40 bg-card/40'
-            const medalIcon = rank === 0 ? Crown : rank === 1 ? Medal : rank === 2 ? Award : null
+            const MedalIcon = rank === 0 ? Crown : rank === 1 ? Medal : rank === 2 ? Award : null
             return (
               <motion.div
                 key={e.patient.id}
@@ -169,8 +169,8 @@ export function ClinicLeaderboard({ patients, onPatientClick }: ClinicLeaderboar
               >
                 {/* Rank */}
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-                  {medalIcon ? (
-                    <medalIcon className={cn(
+                  {MedalIcon ? (
+                    <MedalIcon className={cn(
                       'h-5 w-5',
                       rank === 0 ? 'text-amber-500' : rank === 1 ? 'text-slate-400' : 'text-orange-700',
                     )} />
