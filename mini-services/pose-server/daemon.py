@@ -1,5 +1,5 @@
 """
-Double-fork daemon launcher for the NeuroMove Pose Server.
+Double-fork daemon launcher for the Nuhoud Pose Server.
 
 The sandbox reaps any process that still shares a controlling terminal with the
 Bash tool that spawned it. This launcher performs the classic Unix double-fork

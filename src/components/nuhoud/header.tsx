@@ -7,9 +7,9 @@ import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { WsConnectionState } from '@/components/neuromove/types'
-import { UserMenu } from '@/components/neuromove/user-menu'
-import { NotificationBell } from '@/components/neuromove/notification-bell'
+import type { WsConnectionState } from '@/components/nuhoud/types'
+import { UserMenu } from '@/components/nuhoud/user-menu'
+import { NotificationBell } from '@/components/nuhoud/notification-bell'
 import { useAuth } from '@/hooks/use-auth'
 
 interface HeaderProps {
@@ -19,13 +19,13 @@ interface HeaderProps {
   onToggleRtl: () => void
 }
 
-function NeuroMoveLogo({ className }: { className?: string }) {
+function NuhoudLogo({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 64 64"
       className={className}
       role="img"
-      aria-label="NeuroMove neuron-joint logo"
+      aria-label="Nuhoud neuron-joint logo"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -115,11 +115,11 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
             transition={{ duration: 0.4 }}
             className="text-teal-500"
           >
-            <NeuroMoveLogo className="h-9 w-9 sm:h-10 sm:w-10" />
+            <NuhoudLogo className="h-9 w-9 sm:h-10 sm:w-10" />
           </motion.div>
           <div className="flex flex-col">
             <span className="text-base font-bold tracking-tight text-foreground sm:text-lg">
-              نهوض
+              نُهوض
             </span>
             <span className="text-[10px] leading-tight text-muted-foreground sm:text-xs">
               علاج رقمي · تأهيل الأطراف العلوية بعد السكتة · سلطنة عُمان
@@ -138,7 +138,7 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
               aria-label={`اتجاه النص: ${rtl ? 'عربي RTL' : 'إنجليزي LTR'}`}
             >
               <span className="text-foreground">
-                مرحباً بكم في نهوض
+                مرحباً بكم في نُهوض
               </span>
             </Badge>
           )}

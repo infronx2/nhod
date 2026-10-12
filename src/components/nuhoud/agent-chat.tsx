@@ -42,7 +42,7 @@ const SUGGESTED_PROMPTS = [
 ]
 
 /**
- * AgentChat — the NeuroMove AI Rehab Coach chat panel.
+ * AgentChat — the Nuhoud AI Rehab Coach chat panel.
  *
  * Calls POST /api/v2/agent/chat with the user's message. The backend fetches
  * the patient's real clinical context (active plan, stats, sessions, badges,

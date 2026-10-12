@@ -49,26 +49,26 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
-import { AgentChat } from '@/components/neuromove/agent-chat'
-import { FhirBundleButton } from '@/components/neuromove/fhir-bundle-button'
-import { SetGoalDialog } from '@/components/neuromove/set-goal-dialog'
-import { GoalsTracker } from '@/components/neuromove/goals-tracker'
+import { AgentChat } from '@/components/nuhoud/agent-chat'
+import { FhirBundleButton } from '@/components/nuhoud/fhir-bundle-button'
+import { SetGoalDialog } from '@/components/nuhoud/set-goal-dialog'
+import { GoalsTracker } from '@/components/nuhoud/goals-tracker'
 import type {
   V2PatientDetail,
   V2Stats,
   V2CreatePlanPayload,
   V2TreatmentPlan,
 } from '@/lib/v2-types'
-import { GradientAvatar } from '@/components/neuromove/gradient-avatar'
-import { ActivityChart } from '@/components/neuromove/activity-chart'
-import { AccuracyDonut } from '@/components/neuromove/accuracy-donut'
-import { RomTrendChart } from '@/components/neuromove/rom-trend-chart'
-import { ActivityHeatmap } from '@/components/neuromove/activity-heatmap'
-import { CompTrendChart } from '@/components/neuromove/comp-trend-chart'
-import { LimbBreakdown } from '@/components/neuromove/limb-breakdown'
-import { ProgressTimeline } from '@/components/neuromove/progress-timeline'
-import { BadgesPanel } from '@/components/neuromove/badges-panel'
-import { FhirViewer } from '@/components/neuromove/fhir-viewer'
+import { GradientAvatar } from '@/components/nuhoud/gradient-avatar'
+import { ActivityChart } from '@/components/nuhoud/activity-chart'
+import { AccuracyDonut } from '@/components/nuhoud/accuracy-donut'
+import { RomTrendChart } from '@/components/nuhoud/rom-trend-chart'
+import { ActivityHeatmap } from '@/components/nuhoud/activity-heatmap'
+import { CompTrendChart } from '@/components/nuhoud/comp-trend-chart'
+import { LimbBreakdown } from '@/components/nuhoud/limb-breakdown'
+import { ProgressTimeline } from '@/components/nuhoud/progress-timeline'
+import { BadgesPanel } from '@/components/nuhoud/badges-panel'
+import { FhirViewer } from '@/components/nuhoud/fhir-viewer'
 
 interface PatientDetailProps {
   patientId: string

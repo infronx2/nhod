@@ -10,7 +10,7 @@ import type {
   WsConnectionState,
   WsCommand,
   PoseLandmarks,
-} from '@/components/neuromove/types'
+} from '@/components/nuhoud/types'
 
 const WS_PATH = '/ws/track'
 
@@ -70,7 +70,7 @@ const MESSAGE_LOG_LIMIT = 200
 
 /**
  * usePoseTracking — encapsulates the entire WebSocket lifecycle against the
- * NeuroMove Python inference backend (mini-services/pose-server on :8001).
+ * Nuhoud Python inference backend (mini-services/pose-server on :8001).
  *
  * Connection URL: ws://${window.location.host}/ws/track?XTransformPort=8001
  * (the Caddy gateway rewrites ?XTransformPort=8001 to localhost:8001)
@@ -148,7 +148,7 @@ export function usePoseTracking(initial: PoseTrackingConfig): PoseTrackingApi {
 
     ws.onopen = () => {
       setConnection('Connected')
-      toast.success('Connected to NeuroMove inference server', {
+      toast.success('Connected to Nuhoud inference server', {
         description: 'WebSocket live · ready for frames',
       })
     }

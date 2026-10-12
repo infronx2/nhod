@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { motion } from 'framer-motion'
+import { useTranslations } from 'next-intl'
 import {
   Target,
   Calendar,
@@ -25,13 +26,17 @@ interface PatientHeaderProps {
 }
 
 /**
- * PatientHeader — prominent banner card showing the authenticated patient's
- * active treatment plan (title, target angle, sessions/week, daily rep goal,
- * prescriber) with a progress bar of today's reps vs daily goal.
+ * PatientHeader — لافتة بارزة تعرض خطة المريض العلاجية الحالية (العنوان،
+ * الزاوية المستهدفة، الجلسات/الأسبوع، الهدف اليومي، الطبيب الواصف) مع شريط
+ * تقدّم لتكرارات اليوم مقابل الهدف اليومي.
  *
- * Renders a tasteful "no active plan" empty state when no plan is found.
+ * مثال على استخدام `useTranslations` من next-intl: كل النصوص تأتي من
+ * `messages/ar.json` تحت نطاق `patient`. يسمح النمط `t('key')` بتبديل اللغة
+ * لاحقاً بسهولة دون تعديل الكود.
  */
 export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderProps) {
+  const t = useTranslations('patient')
+
   if (loading && !plan) {
     return (
       <Card className="border-border/40 bg-card/60 p-4 shadow-lg shadow-black/20 backdrop-blur sm:p-6">
@@ -46,10 +51,10 @@ export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderPro
         <div className="flex flex-col items-center justify-center gap-2 text-center">
           <ClipboardList className="h-10 w-10 text-muted-foreground/60" aria-hidden="true" />
           <p className="text-sm font-medium text-muted-foreground">
-            No active treatment plan
+            {t('noActivePlan')}
           </p>
           <p className="text-xs text-muted-foreground">
-            Your clinician can prescribe a rehab plan from the doctor dashboard.
+            {t('noActivePlanDesc')}
           </p>
         </div>
       </Card>
@@ -60,10 +65,10 @@ export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderPro
   const pct = Math.min(100, Math.round((todayReps / dailyGoal) * 100))
   const limbLabel =
     plan.targetLimb === 'upper_left'
-      ? 'Left upper limb'
+      ? t('leftLimb') ?? 'الطرف العلوي الأيسر'
       : plan.targetLimb === 'bilateral'
-        ? 'Bilateral'
-        : 'Right upper limb'
+        ? 'جانبين'
+        : 'الطرف العلوي الأيمن'
 
   return (
     <motion.div
@@ -71,10 +76,10 @@ export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderPro
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className="relative overflow-hidden border-border/40 bg-gradient-to-br from-teal-500/10 via-card/60 to-emerald-500/5 p-4 shadow-lg shadow-black/20 backdrop-blur sm:p-6">
-        {/* subtle radial glow */}
+      <Card className="relative overflow-hidden border-border/40 bg-gradient-to-bl from-teal-500/10 via-card/60 to-emerald-500/5 p-4 shadow-lg shadow-black/20 backdrop-blur sm:p-6">
+        {/* توهج شعاعي خفيف */}
         <div
-          className="pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full opacity-40 blur-3xl"
+          className="pointer-events-none absolute -top-12 -left-12 h-48 w-48 rounded-full opacity-40 blur-3xl"
           style={{
             background:
               'radial-gradient(circle at center, rgba(20,184,166,0.5), transparent 70%)',
@@ -87,7 +92,7 @@ export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderPro
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-teal-500" />
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-                  Active treatment plan
+                  {t('activePlan')}
                 </span>
               </div>
               <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
@@ -96,7 +101,7 @@ export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderPro
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <Badge variant="outline" className="gap-1 border-border/60 px-2 py-0.5 font-normal">
                   <Stethoscope className="h-3 w-3" />
-                  {plan.doctor?.name ?? 'Prescribed clinician'}
+                  {plan.doctor?.name ?? t('prescribedBy')}
                 </Badge>
                 <Badge variant="outline" className="gap-1 border-border/60 px-2 py-0.5 font-normal">
                   {limbLabel}
@@ -104,15 +109,15 @@ export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderPro
                 {plan.notes && (
                   <Badge variant="outline" className="gap-1 border-border/60 px-2 py-0.5 font-normal">
                     <ClipboardList className="h-3 w-3" />
-                    Notes
+                    {t('notes')}
                   </Badge>
                 )}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <PlanStat icon={Target} label="Target angle" value={`${plan.targetAngle}°`} accent="text-amber-500" />
-              <PlanStat icon={Calendar} label="Sessions/wk" value={plan.sessionsPerWeek} accent="text-teal-500" />
-              <PlanStat icon={Activity} label="Daily goal" value={plan.dailyRepGoal} accent="text-emerald-500" />
+              <PlanStat icon={Target} label={t('target')} value={`${plan.targetAngle}°`} accent="text-amber-500" />
+              <PlanStat icon={Calendar} label={t('sessionsPerWeek')} value={plan.sessionsPerWeek} accent="text-teal-500" />
+              <PlanStat icon={Activity} label={t('dailyRepGoal')} value={plan.dailyRepGoal} accent="text-emerald-500" />
             </div>
           </div>
 
@@ -124,22 +129,23 @@ export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderPro
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-muted-foreground">Today's reps</span>
+              <span className="font-medium text-muted-foreground">{t('repsToday')}</span>
               <span className="font-mono font-semibold">
                 <span className={cn(pct >= 100 ? 'text-emerald-500' : 'text-foreground')}>
                   {todayReps}
                 </span>
                 <span className="text-muted-foreground"> / {plan.dailyRepGoal}</span>
-                <span className="ml-2 text-muted-foreground">{pct}%</span>
+                <span className="ms-2 text-muted-foreground">{pct}%</span>
               </span>
             </div>
+            {/* استخدام ps/pe (logical properties) بدل pl/pr ليدعم RTL تلقائياً */}
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <motion.div
                 className={cn(
                   'h-full rounded-full',
                   pct >= 100
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
-                    : 'bg-gradient-to-r from-teal-500 to-emerald-500',
+                    ? 'bg-gradient-to-l from-emerald-500 to-teal-500'
+                    : 'bg-gradient-to-l from-teal-500 to-emerald-500',
                 )}
                 initial={{ width: 0 }}
                 animate={{ width: `${pct}%` }}
@@ -148,7 +154,7 @@ export function PatientHeader({ plan, todayReps = 0, loading }: PatientHeaderPro
             </div>
             {pct >= 100 && (
               <div className="text-xs font-medium text-emerald-500">
-                ✓ Daily goal reached — great work!
+                ✓ {t('goalReached')}
               </div>
             )}
           </div>

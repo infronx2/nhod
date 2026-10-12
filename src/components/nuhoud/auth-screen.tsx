@@ -32,7 +32,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const DEMO_ACCOUNTS = [
   {
     label: 'طبيب — د. سالم الحبسي',
-    email: 'doctor@neuromove.health',
+    email: 'doctor@nuhoud.health',
     password: 'demo1234',
     role: 'DOCTOR' as const,
     icon: Shield,
@@ -40,7 +40,7 @@ const DEMO_ACCOUNTS = [
   },
   {
     label: 'مريض — ليلى المنذرية',
-    email: 'layla@neuromove.health',
+    email: 'layla@nuhoud.health',
     password: 'demo1234',
     role: 'PATIENT' as const,
     icon: UserRound,
@@ -48,7 +48,7 @@ const DEMO_ACCOUNTS = [
   },
   {
     label: 'مريض — عمر السناني',
-    email: 'omar@neuromove.health',
+    email: 'omar@nuhoud.health',
     password: 'demo1234',
     role: 'PATIENT' as const,
     icon: UserRound,
@@ -59,7 +59,7 @@ const DEMO_ACCOUNTS = [
 /**
  * AuthScreen — beautiful split-screen login/register.
  *
- * Left: NeuroMove brand panel with a subtle radial teal glow, an animated
+ * Left: Nuhoud brand panel with a subtle radial teal glow, an animated
  * neuron SVG, and the bilingual tagline.
  * Right: tabbed login/register form with email validation, password eye
  * toggle, and one-click demo-account quick-login buttons.
@@ -182,7 +182,7 @@ export function AuthScreen() {
           </motion.div>
           <div className="flex flex-col">
             <span className="text-2xl font-bold tracking-tight text-white">
-              NeuroMove
+              Nuhoud
             </span>
             <span className="text-xs text-slate-400">
               Digital Therapeutic · post-stroke upper-limb rehab
@@ -235,7 +235,7 @@ export function AuthScreen() {
               <NeuronMark className="h-9 w-9" />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-bold tracking-tight">نهوض</span>
+              <span className="text-lg font-bold tracking-tight">نُهوض</span>
               <span className="text-[10px] text-muted-foreground">
                 علاج رقمي · تأهيل ما بعد السكتة
               </span>
@@ -258,7 +258,7 @@ export function AuthScreen() {
                 <CardHeader>
                   <CardTitle className="text-xl">مرحباً بعودتك</CardTitle>
                   <CardDescription>
-                    سجّل الدخول إلى حسابك في نهوض للمتابعة.
+                    سجّل الدخول إلى حسابك في نُهوض للمتابعة.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -486,7 +486,7 @@ function NeuronMark({ className }: { className?: string }) {
       viewBox="0 0 64 64"
       className={className}
       role="img"
-      aria-label="NeuroMove neuron-joint mark"
+      aria-label="Nuhoud neuron-joint mark"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >

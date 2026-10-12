@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
-import { GradientAvatar } from '@/components/neuromove/gradient-avatar'
+import { GradientAvatar } from '@/components/nuhoud/gradient-avatar'
 import { cn } from '@/lib/utils'
 import type { V2PatientSummary } from '@/lib/v2-types'
 

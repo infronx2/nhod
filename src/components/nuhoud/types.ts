@@ -1,5 +1,5 @@
 /**
- * Shared NeuroMove types — match the backend WebSocket protocol exactly.
+ * Shared Nuhoud types — match the backend WebSocket protocol exactly.
  * Authoritative spec: mini-services/pose-server/main.py (Task ID 1-4).
  */
 

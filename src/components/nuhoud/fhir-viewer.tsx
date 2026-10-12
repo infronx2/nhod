@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Download, Copy, FileJson, Loader2, Activity } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { SessionReplay } from '@/components/neuromove/session-replay'
+import { SessionReplay } from '@/components/nuhoud/session-replay'
 import type { V2FhirResponse } from '@/lib/v2-types'
 
 interface FhirViewerProps {

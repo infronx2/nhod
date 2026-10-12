@@ -2,27 +2,27 @@
 
 import * as React from 'react'
 import { Loader2 } from 'lucide-react'
-import { Header } from '@/components/neuromove/header'
-import { ArchitectureDiagram } from '@/components/neuromove/architecture-diagram'
+import { Header } from '@/components/nuhoud/header'
+import { ArchitectureDiagram } from '@/components/nuhoud/architecture-diagram'
 import {
   TrackingPanel,
   type TrackSnapshot,
-} from '@/components/neuromove/tracking-panel'
-import { JsonStream } from '@/components/neuromove/json-stream'
-import { SessionHistory } from '@/components/neuromove/session-history'
-import { BiomechanicsExplainer } from '@/components/neuromove/biomechanics-explainer'
-import { ApiReference } from '@/components/neuromove/api-reference'
-import { Footer } from '@/components/neuromove/footer'
-import { AuthScreen } from '@/components/neuromove/auth-screen'
-import { DoctorDashboard } from '@/components/neuromove/doctor-dashboard'
-import { PatientHeader } from '@/components/neuromove/patient-header'
-import { StreakBadge } from '@/components/neuromove/streak-badge'
-import { GoalsTracker } from '@/components/neuromove/goals-tracker'
-import { WeeklyInsights } from '@/components/neuromove/weekly-insights'
-import { ConfettiOverlay } from '@/components/neuromove/confetti-overlay'
-import { BadgesPanel } from '@/components/neuromove/badges-panel'
-import { ActivityChart } from '@/components/neuromove/activity-chart'
-import { AgentChat } from '@/components/neuromove/agent-chat'
+} from '@/components/nuhoud/tracking-panel'
+import { JsonStream } from '@/components/nuhoud/json-stream'
+import { SessionHistory } from '@/components/nuhoud/session-history'
+import { BiomechanicsExplainer } from '@/components/nuhoud/biomechanics-explainer'
+import { ApiReference } from '@/components/nuhoud/api-reference'
+import { Footer } from '@/components/nuhoud/footer'
+import { AuthScreen } from '@/components/nuhoud/auth-screen'
+import { DoctorDashboard } from '@/components/nuhoud/doctor-dashboard'
+import { PatientHeader } from '@/components/nuhoud/patient-header'
+import { StreakBadge } from '@/components/nuhoud/streak-badge'
+import { GoalsTracker } from '@/components/nuhoud/goals-tracker'
+import { WeeklyInsights } from '@/components/nuhoud/weekly-insights'
+import { ConfettiOverlay } from '@/components/nuhoud/confetti-overlay'
+import { BadgesPanel } from '@/components/nuhoud/badges-panel'
+import { ActivityChart } from '@/components/nuhoud/activity-chart'
+import { AgentChat } from '@/components/nuhoud/agent-chat'
 import { Card } from '@/components/ui/card'
 import { usePoseTracking } from '@/hooks/use-pose-tracking'
 import { useAuth, AuthProvider } from '@/hooks/use-auth'
@@ -318,7 +318,7 @@ function LoadingGate() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background">
       <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
-      <p className="text-sm text-muted-foreground">Loading NeuroMove…</p>
+      <p className="text-sm text-muted-foreground">Loading Nuhoud…</p>
     </div>
   )
 }

@@ -15,7 +15,7 @@ import {
   Gauge,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { WsCommand } from '@/components/neuromove/types'
+import type { WsCommand } from '@/components/nuhoud/types'
 
 const ICONS: Record<WsCommand, React.ComponentType<{ className?: string }>> = {
   KEEP_GOING: Activity,

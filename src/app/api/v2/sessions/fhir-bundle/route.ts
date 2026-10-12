@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
   // Build the FHIR Bundle.
   const bundle = {
     resourceType: 'Bundle',
-    id: `neuromove-bundle-${patientId}-${Date.now()}`,
+    id: `nuhoud-bundle-${patientId}-${Date.now()}`,
     type: 'collection',
     timestamp: new Date().toISOString(),
     total: sessions.length,
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
               display: 'Upper extremity range of motion',
             },
           ],
-          text: `NeuroMove ${s.limb} elbow flexion rehab session`,
+          text: `Nuhoud ${s.limb} elbow flexion rehab session`,
         },
         subject: {
           reference: `Patient/${s.patientId}`,
@@ -124,13 +124,13 @@ export async function GET(req: NextRequest) {
         ],
         note: s.plan?.title
           ? [{ text: `Prescribed under plan: ${s.plan.title}` }]
-          : [{ text: 'Source: NeuroMove digital therapeutic platform' }],
+          : [{ text: 'Source: Nuhoud digital therapeutic platform' }],
         meta: {
           tag: [
             {
-              system: 'https://neuromove.health',
-              code: 'neuromove',
-              display: 'NeuroMove',
+              system: 'https://nuhoud.health',
+              code: 'nuhoud',
+              display: 'Nuhoud',
             },
           ],
           lastUpdated: s.createdAt.toISOString(),

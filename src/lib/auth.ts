@@ -1,5 +1,5 @@
 /**
- * NeuroMove auth helpers — JWT issue + verify, password hash + compare.
+ * Nuhoud auth helpers — JWT issue + verify, password hash + compare.
  *
  * Uses HS256 with a per-process secret. In production this would come from a
  * secret manager; here we fall back to a deterministic dev secret so tokens
@@ -9,8 +9,8 @@ import jwt, { type JwtPayload } from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 
 const DEV_SECRET =
-  process.env.NEUROMOVE_JWT_SECRET ||
-  'neuromove-dev-secret-change-in-prod-7f3a9e1b'
+  process.env.NUHOUD_JWT_SECRET ||
+  'nuhoud-dev-secret-change-in-prod-7f3a9e1b'
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
 

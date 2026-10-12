@@ -12,7 +12,7 @@ import { createNotification, notifyBadgesEarned } from '@/lib/notifications'
  * calls POST /api/v2/sessions manually (e.g. if the patient closes the
  * app mid-session).
  *
- * Auth: a shared `X-NeuroMove-Key` header (the dev secret is deterministic;
+ * Auth: a shared `X-Nuhoud-Key` header (the dev secret is deterministic;
  * production rotates via env). NOT a JWT — the pose-server doesn't hold
  * patient credentials, so it authenticates as a trusted internal service.
  *
@@ -30,10 +30,10 @@ import { createNotification, notifyBadgesEarned } from '@/lib/notifications'
  *   angle_timeline?: number[],
  * }
  */
-const SYNC_API_KEY = process.env.NEUROMOVE_SYNC_API_KEY || 'neuromove-internal-sync-dev-7f3a9e1b'
+const SYNC_API_KEY = process.env.NUHOUD_SYNC_API_KEY || 'nuhoud-internal-sync-dev-7f3a9e1b'
 
 export async function POST(req: NextRequest) {
-  const key = req.headers.get('x-neuromove-key')
+  const key = req.headers.get('x-nuhoud-key')
   if (!key || key !== SYNC_API_KEY) {
     return NextResponse.json({ ok: false, error: 'invalid sync key' }, { status: 401 })
   }

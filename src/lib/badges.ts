@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 
 /**
- * NeuroMove gamification — checks a patient's full history and awards any
+ * Nuhoud gamification — checks a patient's full history and awards any
  * newly-earned badges. Idempotent: returns only badges that were actually
  * inserted in this call (the EarnedBadge table has a unique(userId, slug)).
  *

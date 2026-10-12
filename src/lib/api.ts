@@ -1,5 +1,5 @@
 /**
- * apiFetch — thin wrapper around fetch that auto-attaches the NeuroMove JWT
+ * apiFetch — thin wrapper around fetch that auto-attaches the Nuhoud JWT
  * Bearer token and gracefully handles 401 by clearing the token and bouncing
  * the user back to the unauthenticated state.
  *
@@ -7,7 +7,7 @@
  * server itself, so NO XTransformPort is required.
  */
 
-const TOKEN_KEY = 'neuromove_token'
+const TOKEN_KEY = 'nuhoud_token'
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null

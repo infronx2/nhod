@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { GradientAvatar } from '@/components/neuromove/gradient-avatar'
+import { GradientAvatar } from '@/components/nuhoud/gradient-avatar'
 import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import type { V2PatientSummary } from '@/lib/v2-types'

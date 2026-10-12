@@ -9,20 +9,20 @@ import { hashPassword } from '@/lib/auth'
  * sessions so the doctor dashboard isn't empty on first load.
  *
  * Demo accounts (password = "demo1234" for all):
- *   doctor@neuromove.health   — DOCTOR
- *   layla@neuromove.health    — PATIENT (right-side affected, lots of sessions)
- *   omar@neuromove.health     — PATIENT (left-side affected, fewer sessions)
+ *   doctor@nuhoud.health   — DOCTOR
+ *   layla@nuhoud.health    — PATIENT (right-side affected, lots of sessions)
+ *   omar@nuhoud.health     — PATIENT (left-side affected, fewer sessions)
  */
 export async function POST() {
   const created: Record<string, number> = {
     users: 0, plans: 0, sessions: 0, presets: 0, badges: 0,
   }
 
-  const existingDoctor = await db.user.findUnique({ where: { email: 'doctor@neuromove.health' } })
+  const existingDoctor = await db.user.findUnique({ where: { email: 'doctor@nuhoud.health' } })
   if (!existingDoctor) {
     const doctor = await db.user.create({
       data: {
-        email: 'doctor@neuromove.health',
+        email: 'doctor@nuhoud.health',
         name: 'د. سالم الحبسي',
         role: 'DOCTOR',
         passwordHash: hashPassword('demo1234'),
@@ -33,7 +33,7 @@ export async function POST() {
     const [layla, omar] = await Promise.all([
       db.user.create({
         data: {
-          email: 'layla@neuromove.health',
+          email: 'layla@nuhoud.health',
           name: 'ليلى المنذرية',
           role: 'PATIENT',
           passwordHash: hashPassword('demo1234'),
@@ -44,7 +44,7 @@ export async function POST() {
       }),
       db.user.create({
         data: {
-          email: 'omar@neuromove.health',
+          email: 'omar@nuhoud.health',
           name: 'عمر السناني',
           role: 'PATIENT',
           passwordHash: hashPassword('demo1234'),
@@ -165,9 +165,9 @@ export async function POST() {
     created,
     totals: { users: userCount, sessions: sessionCount, presets: presetCount2 },
     demoAccounts: [
-      { email: 'doctor@neuromove.health', password: 'demo1234', role: 'DOCTOR', name: 'د. سالم الحبسي' },
-      { email: 'layla@neuromove.health', password: 'demo1234', role: 'PATIENT', name: 'ليلى المنذرية' },
-      { email: 'omar@neuromove.health', password: 'demo1234', role: 'PATIENT', name: 'عمر السناني' },
+      { email: 'doctor@nuhoud.health', password: 'demo1234', role: 'DOCTOR', name: 'د. سالم الحبسي' },
+      { email: 'layla@nuhoud.health', password: 'demo1234', role: 'PATIENT', name: 'ليلى المنذرية' },
+      { email: 'omar@nuhoud.health', password: 'demo1234', role: 'PATIENT', name: 'عمر السناني' },
     ],
   })
 }

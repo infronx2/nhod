@@ -1,5 +1,5 @@
 /**
- * NeuroMove notifications helper.
+ * Nuhoud notifications helper.
  *
  * Centralized create + fetch for the Notification feed. Called from:
  *  - badge awarding (after a session is saved)

@@ -1,5 +1,5 @@
 """
-NeuroMove - Real-Time AI Inference Server
+Nuhoud - Real-Time AI Inference Server
 ==========================================
 
 Phase 1 deliverable: a production-ready FastAPI + WebSocket + MediaPipe Pose
@@ -7,7 +7,7 @@ backend for post-stroke upper-limb rehabilitation.
 
 Architecture role
 -----------------
-This server is the "Real-Time Processing Tier" of the NeuroMove distributed
+This server is the "Real-Time Processing Tier" of the Nuhoud distributed
 system. It receives camera frames from the Unreal Engine 5 (UE5) mobile client
 (or any WebSocket client, including the Next.js test harness) as Base64-encoded
 JPEG strings, runs Google MediaPipe Pose to extract 3D landmarks, computes the
@@ -30,7 +30,7 @@ Key design choices
   than a hard-coded pixel threshold because it adapts to camera framing,
   patient distance and patient height.
 
-Author: NeuroMove Backend Team
+Author: Nuhoud Backend Team
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
 )
-logger = logging.getLogger("neuromove.pose")
+logger = logging.getLogger("nuhoud.pose")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -251,8 +251,8 @@ active_connections: int = 0
 
 # Internal API key + target URL for the Next.js auto-sync (system-to-system).
 # The Next.js side validates the same key on POST /api/v2/sessions/sync.
-SYNC_API_KEY = os.environ.get("NEUROMOVE_SYNC_API_KEY", "neuromove-internal-sync-dev-7f3a9e1b")
-NEXTJS_BASE_URL = os.environ.get("NEUROMOVE_NEXTJS_URL", "http://localhost:3000")
+SYNC_API_KEY = os.environ.get("NUHOUD_SYNC_API_KEY", "nuhoud-internal-sync-dev-7f3a9e1b")
+NEXTJS_BASE_URL = os.environ.get("NUHOUD_NEXTJS_URL", "http://localhost:3000")
 
 
 async def sync_session_to_nextjs(summary: dict) -> bool:
@@ -277,7 +277,7 @@ async def sync_session_to_nextjs(summary: dict) -> bool:
                 data=payload,
                 headers={
                     "Content-Type": "application/json",
-                    "X-NeuroMove-Key": SYNC_API_KEY,
+                    "X-Nuhoud-Key": SYNC_API_KEY,
                 },
                 method="POST",
             )
@@ -296,16 +296,16 @@ async def sync_session_to_nextjs(summary: dict) -> bool:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("NeuroMove Pose Server starting on port %s", POSE_SERVER_PORT)
+    logger.info("Nuhoud Pose Server starting on port %s", POSE_SERVER_PORT)
     yield
-    logger.info("NeuroMove Pose Server shutting down (active=%s)", active_connections)
+    logger.info("Nuhoud Pose Server shutting down (active=%s)", active_connections)
 
 
 app = FastAPI(
-    title="NeuroMove Pose Inference Server",
+    title="Nuhoud Pose Inference Server",
     description=(
         "Real-time MediaPipe Pose inference + biomechanics for post-stroke "
-        "upper-limb rehabilitation. Phase 1 of the NeuroMove platform."
+        "upper-limb rehabilitation. Phase 1 of the Nuhoud platform."
     ),
     version="1.0.0",
     lifespan=lifespan,
@@ -326,7 +326,7 @@ app.add_middleware(
 async def root():
     """Landing / health probe."""
     return {
-        "service": "NeuroMove Pose Inference Server",
+        "service": "Nuhoud Pose Inference Server",
         "phase": 1,
         "status": "ok",
         "active_connections": active_connections,

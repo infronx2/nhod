@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Cairo, Tajawal } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "../../messages/ar.json";
 import "./globals.css";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "@/components/neuromove/theme-provider";
+import { ThemeProvider } from "@/components/nuhoud/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,11 +33,11 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "نهوض — منصة تأهيل ما بعد السكتة الدماغية",
+  title: "نُهوض — منصة تأهيل ما بعد السكتة الدماغية",
   description:
-    "نهوض منصة علاج رقمية لتأهيل الأطراف العلوية بعد السكتة الدماغية. تتبع حركي لحظي بالذكاء الاصطناعي، تغذية راجعة حركية، وتمارين تأهيل تفاعلية. مصممة لسلطنة عُمان.",
+    "نُهوض منصة علاج رقمية لتأهيل الأطراف العلوية بعد السكتة الدماغية. تتبع حركي لحظي بالذكاء الاصطناعي، تغذية راجعة حركية، وتمارين تأهيل تفاعلية. مصممة لسلطنة عُمان.",
   keywords: [
-    "نهوض",
+    "نُهوض",
     "تأهيل السكتة الدماغية",
     "تأهيل الأطراف العلوية",
     "MediaPipe Pose",
@@ -43,24 +45,24 @@ export const metadata: Metadata = {
     "عمان",
     "علاج رقمي",
   ],
-  authors: [{ name: "فريق نهوض" }],
+  authors: [{ name: "فريق نُهوض" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "نهوض",
+    title: "نُهوض",
     description: "تأهيل الأطراف العلوية بعد السكتة الدماغية · ذكاء اصطناعي لحظي",
-    siteName: "نهوض",
+    siteName: "نُهوض",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "نهوض",
+    title: "نُهوض",
     description: "تأهيل الأطراف العلوية بعد السكتة الدماغية · ذكاء اصطناعي لحظي",
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -70,15 +72,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable} ${tajawal.variable} font-cairo antialiased bg-background text-foreground`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <SonnerToaster position="top-left" richColors closeButton dir="rtl" />
-        </ThemeProvider>
+        <NextIntlClientProvider locale="ar" messages={messages}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <SonnerToaster position="top-left" richColors closeButton dir="rtl" />
+          </ThemeProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

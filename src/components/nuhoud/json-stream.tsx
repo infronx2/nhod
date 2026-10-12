@@ -4,7 +4,7 @@ import * as React from 'react'
 import { Pause, Play, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { ServerMessage, WsCommand, WsErrorCode } from '@/components/neuromove/types'
+import type { ServerMessage, WsCommand, WsErrorCode } from '@/components/nuhoud/types'
 
 interface JsonStreamProps {
   messages: ServerMessage[]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the NeuroMove Pose Inference Server on port 8001.
+# Start the Nuhoud Pose Inference Server on port 8001.
 # Uses the project venv's python3 (where mediapipe / fastapi are installed).
 set -euo pipefail
 

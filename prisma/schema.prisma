@@ -1,4 +1,4 @@
-// NeuroMove Prisma schema
+// Nuhoud Prisma schema
 // Phase 2 data model: users (role-based), treatment_plans, rehab_sessions,
 // exercise presets, achievements. SQLite provider for the sandbox MVP;
 // the same schema runs on PostgreSQL/Supabase in production by flipping

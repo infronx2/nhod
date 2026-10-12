@@ -17,7 +17,7 @@ export function Footer({ rtl }: FooterProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-muted-foreground">
             <HeartPulse className="h-4 w-4 text-rose-500" aria-hidden="true" />
-            <span className="font-semibold text-foreground">نهوض</span>
+            <span className="font-semibold text-foreground">نُهوض</span>
             <span className="opacity-60">·</span>
             <span>النسخة التجريبية</span>
             <span className="opacity-60">·</span>
@@ -55,7 +55,7 @@ export function Footer({ rtl }: FooterProps) {
           هذا النظام لأغراض التأهيل المساعد ولا يغني عن الإشراف الطبي المباشر
         </p>
         <p className="text-[10px] text-muted-foreground/70 text-right">
-          منصة نهوض للتأهيل الرقمي · جميع الحقوق محفوظة © 2026
+          منصة نُهوض للتأهيل الرقمي · جميع الحقوق محفوظة © 2026
         </p>
       </div>
     </footer>

@@ -1,5 +1,5 @@
 /**
- * NeuroMove Agentic AI context builder.
+ * Nuhoud Agentic AI context builder.
  *
  * The original system design calls for a LangChain agent with tools
  * (get_session_stats, get_exercise_instructions). The z-ai-web-dev-sdk
@@ -182,7 +182,7 @@ export function composeSystemPrompt(ctx: AgentContext, preferredDialect: string)
     ? `"${ctx.activePlan.title}" — target ${ctx.activePlan.targetAngle}° on the ${ctx.activePlan.targetLimb}, ${ctx.activePlan.sessionsPerWeek} sessions/week, ${ctx.activePlan.dailyRepGoal} reps/day goal${ctx.activePlan.notes ? `, notes: ${ctx.activePlan.notes}` : ''}`
     : 'No active treatment plan.'
 
-  const base = `You are "NeuroMove Coach", an AI rehabilitation assistant for post-stroke upper-limb patients in Oman. You are warm, encouraging, and clinically precise. You help patients understand their progress, stay motivated, and perform exercises correctly.
+  const base = `You are "Nuhoud Coach", an AI rehabilitation assistant for post-stroke upper-limb patients in Oman. You are warm, encouraging, and clinically precise. You help patients understand their progress, stay motivated, and perform exercises correctly.
 
 ## Patient context (REAL data from the database)
 - Name: ${ctx.patient.name}

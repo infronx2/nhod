@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
-import { GradientAvatar } from '@/components/neuromove/gradient-avatar'
+import { GradientAvatar } from '@/components/nuhoud/gradient-avatar'
 
 /**
  * UserMenu — avatar + name + role badge + logout dropdown.

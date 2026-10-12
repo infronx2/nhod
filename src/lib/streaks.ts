@@ -1,5 +1,5 @@
 /**
- * NeuroMove streak tracker.
+ * Nuhoud streak tracker.
  *
  * Updates a patient's consecutive-day streak when a session is saved.
  * - A streak = days with at least one session, consecutive.

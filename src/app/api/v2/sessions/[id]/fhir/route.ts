@@ -58,7 +58,7 @@ export async function GET(
           display: 'Upper extremity range of motion',
         },
       ],
-      text: `NeuroMove ${session.limb} elbow flexion rehab session`,
+      text: `Nuhoud ${session.limb} elbow flexion rehab session`,
     },
     subject: {
       reference: `Patient/${session.patientId}`,
@@ -131,13 +131,13 @@ export async function GET(
     ],
     note: session.plan?.title
       ? [{ text: `Prescribed under plan: ${session.plan.title}` }]
-      : [{ text: 'Source: NeuroMove digital therapeutic platform' }],
+      : [{ text: 'Source: Nuhoud digital therapeutic platform' }],
     meta: {
       tag: [
         {
-          system: 'https://neuromove.health',
-          code: 'neuromove',
-          display: 'NeuroMove',
+          system: 'https://nuhoud.health',
+          code: 'nuhoud',
+          display: 'Nuhoud',
         },
       ],
       lastUpdated: session.createdAt.toISOString(),

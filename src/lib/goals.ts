@@ -1,5 +1,5 @@
 /**
- * NeuroMove rehabilitation goals — doctor-set milestones (ROM target, rep
+ * Nuhoud rehabilitation goals — doctor-set milestones (ROM target, rep
  * count, accuracy, streak) that a patient works toward. When a session is
  * saved, this lib updates the currentValue of any unachieved goals and
  * marks them achieved + fires a celebration notification.

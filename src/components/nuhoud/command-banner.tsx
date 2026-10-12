@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import type { WsCommand } from '@/components/neuromove/types'
+import type { WsCommand } from '@/components/nuhoud/types'
 
 interface CommandBannerProps {
   command: WsCommand

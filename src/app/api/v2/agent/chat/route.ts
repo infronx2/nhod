@@ -8,7 +8,7 @@ const MAX_HISTORY = 20
 /**
  * POST /api/v2/agent/chat
  *
- * The NeuroMove Agentic AI Rehab Coach endpoint.
+ * The Nuhoud Agentic AI Rehab Coach endpoint.
  *
  * Agentic pattern: we fetch the patient's REAL clinical context (active plan,
  * lifetime stats, recent sessions, earned badges, relevant exercises) UP FRONT

@@ -191,7 +191,7 @@ export function useDemoSimulator(): DemoSimulatorApi {
       ctx.fillText(`θ = ${angleDeg.toFixed(1)}°`, 12, 22)
       ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace'
       ctx.fillStyle = 'rgba(148, 163, 184, 0.8)'
-      ctx.fillText('NeuroMove · DEMO SIMULATOR', 12, 38)
+      ctx.fillText('Nuhoud · DEMO SIMULATOR', 12, 38)
       ctx.fillText(`t = ${(t / 1000).toFixed(2)}s`, 12, 52)
     },
     [],

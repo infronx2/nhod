@@ -1,7 +1,7 @@
 /**
  * Phase 2 v2 API TypeScript contracts — mirror the Next.js API routes under
  * /api/v2. The Python pose-server still owns the WebSocket protocol; those
- * types live in `./components/neuromove/types.ts`.
+ * types live in `./components/nuhoud/types.ts`.
  */
 
 export type UserRole = 'PATIENT' | 'DOCTOR' | 'ADMIN'

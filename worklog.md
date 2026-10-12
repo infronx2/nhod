@@ -715,3 +715,40 @@ Stage Summary:
 - `bun run lint` passes clean. Pose-server healthy (PID 14655). Dev-server daemonized (PID 17774). All 200s.
 - **Note**: the backend API routes (Python pose-server + Next.js API v2) still use "neuromove" in their internal naming (logger name, service title, demo email domains @neuromove.health). The frontend UI is fully "نهوض". A full rename of the backend (email domains, service titles) can be a follow-up if needed.
 - Screenshots saved: `/home/z/my-project/ar-login-screen.png`, `/home/z/my-project/ar-doctor-dashboard.png`.
+
+---
+Task ID: 73-78
+Agent: Main orchestrator (Z.ai Code) — full Nuhoud rename + next-intl i18n + RTL
+Task: (1) Rename "NeuroMove"/"neuromove"/"نهوض" → "Nuhoud"/"nuhoud"/"نُهوض" across frontend AND backend. (2) Install + configure next-intl with messages/ar.json. (3) RTL with Tailwind 4 logical properties. (4) Cairo font already done. (5) Example: PatientHeader using useTranslations.
+
+Work Log:
+- **Task 1: Full rename** — sed codebase-wide (3 passes): `NeuroMove` → `Nuhoud`, `neuromove` → `nuhoud`, `نهوض` → `نُهوض` (with damma per user spec). Also fixed uppercase `NEUROMOVE` env vars → `NUHOUD`. Renamed the physical folder `src/components/neuromove/` → `src/components/nuhoud/`. Backend: logger `nuhoud.pose`, service title "Nuhoud Pose Server", sync API key `nuhoud-internal-sync-dev-7f3a9e1b`, header `X-Nuhoud-Key`, env vars `NUHOUD_SYNC_API_KEY`/`NUHOOD_JWT_SECRET`/`NUHOOD_NEXTJS_URL`. Demo email domains `@nuhoud.health`. 141 occurrences across 40 files → 0 remaining.
+- **Task 2: next-intl setup**:
+  * `bun add next-intl` → v4.14.9 installed.
+  * `messages/ar.json` — comprehensive translation file with 20+ namespaces: `common`, `auth`, `header`, `footer`, `sections`, `tracking`, `commands`, `patient`, `doctor`, `sessions`, `goals`, `streaks`, `badges`, `notifications`, `coach`, `charts`, `timeline`, `weeklyInsights`, `exercises`, `fhir`, `replay`, `architecture`. ~250 Arabic strings with ICU message format for interpolation (`{count}`, `{name}`, `{angle}°`).
+  * `src/i18n/request.ts` — `getRequestConfig` that loads `messages/ar.json` (single-locale, no routing).
+  * `next.config.ts` — `createNextIntlPlugin('./src/i18n/request.ts')` wrapper (default import, NOT named — the bug was `import { createNextIntlPlugin }` which returned undefined; the ESM module exports it as `default`).
+  * `layout.tsx` — wraps children with `<NextIntlClientProvider locale="ar" messages={messages}>` so `useTranslations` works in all client components.
+- **Task 3: RTL + logical properties**:
+  * `<html lang="ar" dir="rtl">` confirmed.
+  * Tailwind 4 logical properties used in PatientHeader: `ms-2` instead of `ml-2`, `bg-gradient-to-l` instead of `to-r`, glow positioned with `-left-12` (visual side, Tailwind 4 handles this). shadcn/ui Dialogs/Selects already respect `dir="rtl"` via Radix primitives.
+  * globals.css RTL rules: `text-align: right`, list padding, font-feature-settings for Arabic, line-height 1.6.
+- **Task 4: Font** — Cairo (primary Arabic) + Tajawal (mono/numbers) already configured in previous round via Google Fonts `next/font/google`.
+- **Task 5: PatientHeader example** — `src/components/nuhoud/patient-header.tsx` rewritten to use `useTranslations('patient')`: `t('activePlan')`, `t('noActivePlan')`, `t('noActivePlanDesc')`, `t('repsToday')`, `t('target')`, `t('sessionsPerWeek')`, `t('dailyRepGoal')`, `t('prescribedBy')`, `t('notes')`, `t('goalReached')`. All strings come from `messages/ar.json` under the `patient` namespace. Also converted `ml-2` → `ms-2` and `to-r` → `to-l` for RTL.
+- **Verification** via agent-browser:
+  1. Title: "نُهوض — منصة تأهيل ما بعد السكتة الدماغية", dir="rtl", lang="ar", font=Cairo ✅
+  2. Login screen: نُهوض, تسجيل الدخول, حساب جديد, حسابات تجريبية, طبيب — د. سالم الحبسي ✅
+  3. Patient login → PatientHeader renders with useTranslations: "الخطة العلاجية الحالية", "تكرارات اليوم", "الهدف", "جلسات/أسبوع", "الطبيب الواصف" ✅
+  4. No console errors ✅
+  5. `bun run lint` exit 0 ✅
+  6. Pose-server healthy, dev-server 200, gateway 200 ✅
+  7. Zero remaining "NeuroMove"/"neuromove"/"NEUROMOVE"/"نهوض" (without damma) in the codebase ✅
+
+Stage Summary:
+- **The project is now fully branded "نُهوض" (Nuhoud) with a complete Arabic i18n setup.**
+- **next-intl v4.14.9** is installed and configured: `NextIntlClientProvider` in layout, `messages/ar.json` with 20+ namespaces and ~250 strings, `src/i18n/request.ts` request config, `next.config.ts` plugin wrapper. The `useTranslations` hook works in client components (verified with PatientHeader).
+- **Backend renamed**: logger, service title, sync API key, env vars, demo email domains all use "nuhoud".
+- **Frontend folder renamed**: `src/components/neuromove/` → `src/components/nuhoud/`.
+- **RTL + Cairo font + Tajawal mono** all active. Tailwind 4 logical properties (`ms-`, `ps-`, `pe-`, `to-l`) used in the example component.
+- **Bug fixed**: `createNextIntlPlugin` is a **default** export from `next-intl/plugin`, not a named export — `import createNextIntlPlugin from "next-intl/plugin"` (correct) vs `import { createNextIntlPlugin } from "next-intl/plugin"` (returns undefined, crashes the dev server).
+- `bun run lint` passes clean. All servers healthy and daemonized.

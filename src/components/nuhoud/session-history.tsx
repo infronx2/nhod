@@ -20,12 +20,12 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { apiFetch } from '@/lib/api'
-import { FhirViewer } from '@/components/neuromove/fhir-viewer'
+import { FhirViewer } from '@/components/nuhoud/fhir-viewer'
 import type {
   SessionRecord,
   SessionsResponse,
   StatsResponse,
-} from '@/components/neuromove/types'
+} from '@/components/nuhoud/types'
 import type {
   V2Session,
   V2SessionsResponse,
