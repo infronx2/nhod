@@ -20,6 +20,15 @@ public class Nuhoud : ModuleRules
             "InputCore",
             "GameFramework",
             "NavigationSystem",
+            // Phase 2 additions:
+            "UMG",            // Required for UWidget-based HUD
+            "Slate",          // Required for UMG rendering
+            "SlateCore",      // Required for UMG rendering
+            "Niagara",        // Required for particle VFX on target destruction
+            "Audio",          // Required for spatial audio playback
+            "Spline",         // Required for spline-based target movement
+            "MovieScene",     // Required for UMG animations (level-up flash)
+            "TimeManagement", // Required for Timeline/UMG animation playback
         });
 
         // ── WebSocket module (built-in) ─────────────────────────────────
