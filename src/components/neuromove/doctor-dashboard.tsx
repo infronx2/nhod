@@ -24,6 +24,7 @@ import { GradientAvatar } from '@/components/neuromove/gradient-avatar'
 import { AnimatedKpi } from '@/components/neuromove/animated-kpi'
 import { ActivityHeatmap } from '@/components/neuromove/activity-heatmap'
 import { DoctorAnalytics } from '@/components/neuromove/doctor-analytics'
+import { PatientCompare } from '@/components/neuromove/patient-compare'
 import { PatientDetail } from '@/components/neuromove/patient-detail'
 
 interface DoctorDashboardProps {
@@ -175,6 +176,9 @@ export function DoctorDashboard({ doctorId }: DoctorDashboardProps) {
 
       {/* ---------- Analytics: accuracy distribution + plan adherence ---------- */}
       <DoctorAnalytics />
+
+      {/* ---------- Patient comparison (side-by-side) ---------- */}
+      <PatientCompare patients={patients} />
 
       {/* ---------- Roster ---------- */}
       <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">

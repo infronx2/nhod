@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Target, Trophy, Plus, Loader2, Check, Flame, Activity, Gauge } from 'lucide-react'
+import { Target, Trophy, Plus, Loader2, Check, Flame, Activity, Gauge, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,26 +37,48 @@ const TYPE_UNIT: Record<string, string> = {
   streak: ' days',
 }
 
+interface GoalsTrackerProps {
+  /** Optional: fetch a specific patient's goals (for doctor views). Defaults to the current user. */
+  patientId?: string
+}
+
 /**
  * GoalsTracker — shows the patient's active + achieved rehabilitation
  * goals with animated progress bars. Achieved goals get a celebratory
- * checkmark + trophy.
+ * checkmark + trophy. Doctors see a delete button per goal.
  */
-export function GoalsTracker() {
+export function GoalsTracker({ patientId }: GoalsTrackerProps = {}) {
   const { user } = useAuth()
+  const isDoctor = user?.role.toUpperCase() === 'DOCTOR' || user?.role.toUpperCase() === 'ADMIN'
   const [goals, setGoals] = React.useState<Goal[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [deletingId, setDeletingId] = React.useState<string | null>(null)
 
   const fetchGoals = React.useCallback(async () => {
     if (!user) return
     try {
-      const data = await apiFetch<{ ok: boolean; goals: Goal[] }>('/api/v2/goals')
+      const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
+      const data = await apiFetch<{ ok: boolean; goals: Goal[] }>(`/api/v2/goals${qs}`)
       if (data.ok) setGoals(data.goals)
     } catch { /* silent */ }
     finally { setLoading(false) }
-  }, [user])
+  }, [user, patientId])
 
   React.useEffect(() => { void fetchGoals() }, [fetchGoals])
+
+  const handleDelete = React.useCallback(async (goalId: string, title: string) => {
+    setDeletingId(goalId)
+    try {
+      await apiFetch(`/api/v2/goals/${goalId}`, { method: 'DELETE' })
+      setGoals((prev) => prev.filter((g) => g.id !== goalId))
+      toast.success('Goal deleted', { description: `"${title}" removed.` })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'failed'
+      toast.error('Could not delete goal', { description: msg })
+    } finally {
+      setDeletingId(null)
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -123,6 +145,20 @@ export function GoalsTracker() {
                     </p>
                   </div>
                   {g.achieved && <Trophy className="h-3.5 w-3.5 text-amber-500" />}
+                  {isDoctor && (
+                    <button
+                      onClick={() => handleDelete(g.id, g.title)}
+                      disabled={deletingId === g.id}
+                      className="ml-1 rounded p-1 text-muted-foreground/50 transition-colors hover:bg-rose-500/10 hover:text-rose-500 disabled:opacity-40"
+                      aria-label={`Delete goal ${g.title}`}
+                    >
+                      {deletingId === g.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3" />
+                      )}
+                    </button>
+                  )}
                 </div>
 
                 {/* Progress bar */}

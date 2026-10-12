@@ -52,6 +52,7 @@ import { apiFetch } from '@/lib/api'
 import { AgentChat } from '@/components/neuromove/agent-chat'
 import { FhirBundleButton } from '@/components/neuromove/fhir-bundle-button'
 import { SetGoalDialog } from '@/components/neuromove/set-goal-dialog'
+import { GoalsTracker } from '@/components/neuromove/goals-tracker'
 import type {
   V2PatientDetail,
   V2Stats,
@@ -416,6 +417,9 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
       <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
         <ProgressTimeline patientId={patientId} loading={loading} />
       </Card>
+
+      {/* ---------- Goals tracker (with delete for doctors) ---------- */}
+      <GoalsTracker patientId={patientId} />
 
       {/* ---------- Badges + Sessions table ---------- */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

@@ -581,3 +581,42 @@ Stage Summary:
   3. Pose-server logging: configure uvicorn's log handlers so WS open/close/sync messages reach server.log.
   4. Full E2E confetti test: set a new unachieved goal, save a session that exceeds it, verify the confetti fires (the wiring is correct but wasn't E2E-tested this round because the existing demo goal is already achieved).
   5. A "goal delete" option for doctors + a goal-progress sparkline in the goals tracker.
+
+---
+Task ID: 51-55
+Agent: webDevReview cron (round 8, 15-min recurring review)
+Task: Assess project status, run agent-browser QA, fix bugs, advance Phase 3+ (goal delete endpoint + UI, patient comparison view for doctors, nm-shimmer skeleton polish). Continue from the stable round-7 baseline.
+
+Work Log:
+- Read worklog Tasks 1-50. Round 7 complete (Set Goal dialog, confetti, weekly insights). Open follow-ups: Arabic i18n, nm-shimmer to all skeletons, pose-server logging, goal delete + sparkline, patient comparison.
+- **QA first**: pose-server healthy (PID 14655). Dev server healthy (PID 17774). Dashboard renders clean, no console errors. Round 7 stable.
+- **Feature (Task 52) — Goal delete + goal-progress display on patient detail**:
+  * New `DELETE /api/v2/goals/[id]` endpoint (`src/app/api/v2/goals/[id]/route.ts`) — doctors + admins only. Verifies the goal exists (404 if not), then deletes it.
+  * Updated `src/components/neuromove/goals-tracker.tsx`:
+    - Added a `patientId` prop so the component can fetch a SPECIFIC patient's goals (for the doctor's patient-detail view) instead of the current user's. The fetch URL now includes `?patientId=X` when set.
+    - Added a delete button (Trash2 icon, rose hover) per goal row — only visible to doctors (`isDoctor` check). Shows a spinner while deleting, then removes the goal from the list + toasts "Goal deleted".
+    - Added the GoalsTracker to the patient-detail page (with `patientId` passed in) so doctors can see + delete a patient's goals from the detail view.
+  * **Verified**: doctor opens Layla's detail → 2 delete-goal buttons appear ("Delete goal Reach 43 days Streak" + "Delete goal Reach 120° elbow flexion") → clicked delete on the streak goal → button count went from 2 → 1 (goal removed) → no errors. DB RehabGoal count went 2 → 1.
+- **Feature (Task 53) — Patient comparison view for doctors**:
+  * `src/components/neuromove/patient-compare.tsx` — a glassmorphism card that lets the doctor pick 2 patients from the roster via Select dropdowns (disabling the already-selected patient in the other picker) and shows a side-by-side comparison across 5 metrics: Sessions, Total reps, Accuracy, Max ROM, Streak. Each metric row has a 3-column grid (A value | label+icon | B value) with the winner's value highlighted in emerald + a ▲ indicator. Patient summary footers at the bottom with gradient avatars + affected-side badges. Fetches `/api/v2/patients/[id]` (for aggregate stats) + `/api/v2/streak` for each patient. Skeleton loading.
+  * Added `<PatientCompare patients={patients} />` to the doctor dashboard between the DoctorAnalytics and the roster.
+  * **Verified**: doctor dashboard shows "Patient comparison · Patient A: عمر السناني · Patient B: ليلى المنذرية" with side-by-side metrics: Sessions 3 vs 23 (▲ Layla), Total reps 26 vs 208 (▲ Layla), Accuracy 85% vs 88% (▲ Layla), Max ROM 88° vs 160° (▲ Layla), Streak 0d vs 0d. Patient footers with avatars + affected-side badges. No errors. Screenshot saved to `/home/z/my-project/r8-patient-compare.png`.
+- **Styling polish (Task 54)**: the PatientCompare card uses `nm-glass` glassmorphism, the delete button has a rose hover micro-interaction, the comparison rows use staggered entrance animations, the winner highlight uses emerald text + ▲ indicator. The GoalsTracker delete button is subtle (muted by default, rose on hover) so it doesn't distract from the goal content.
+- **Verification (Task 55)** via agent-browser through the gateway at http://localhost:81/:
+  1. Doctor login → dashboard: KPI tiles + heatmap + DoctorAnalytics + **PatientCompare** (side-by-side metrics with winner indicators) + patient roster. No errors.
+  2. Doctor → patient detail (Layla): **GoalsTracker** renders with the patient's goals + delete buttons → clicked delete → goal removed → button count 2 → 1. No errors.
+  3. `bun run lint` → exit 0.
+  4. DB counts: 4 users, 3 plans, 26 sessions, 7 presets, 6 badges, 2 chat messages, 9 notifications, **1 RehabGoal** (was 2, deleted 1), 2 Streaks.
+
+Stage Summary:
+- **Round 8 is COMPLETE and browser-verified.** NeuroMove now has:
+  * **Goal delete** — doctors can delete rehabilitation goals from the patient detail UI (Trash2 button per goal, rose hover, spinner while deleting). New `DELETE /api/v2/goals/[id]` endpoint. The GoalsTracker now accepts a `patientId` prop so it fetches the patient's (not the current user's) goals on the doctor's detail view.
+  * **Patient comparison view** — a side-by-side comparison card on the doctor dashboard where the doctor picks 2 patients and sees their Sessions/Reps/Accuracy/Max-ROM/Streak compared, with winner indicators (emerald + ▲) per metric. New `PatientCompare` component with glassmorphism + staggered animations.
+- The app is now a 9-tier fullstack platform: (1) Python FastAPI on :8001 for real-time WebSocket pose inference + auto-sync, (2) Next.js API v2 routes (Prisma → SQLite) for persistence/auth/management, (3) z-ai LLM for agentic coaching with persisted conversations, (4) a real-time SSE notification system, (5) a clinical analytics layer (heatmap + comp trend + per-limb breakdown + accuracy histogram + adherence gauge), (6) a patient progress timeline, (7) a gamification layer (badges + streaks + goals + FHIR bundle export), (8) a patient engagement layer (weekly insights + confetti + set-goal dialog), (9) a clinical decision-support layer (patient comparison + goal management).
+- `bun run lint` passes clean. Pose-server healthy (PID 14655). Dev-server daemonized (PID 17774). Both survive across bash calls. Demo accounts: `doctor@neuromove.health` / `layla@neuromove.health` / `omar@neuromove.health`, all password `demo1234`.
+- **Open follow-ups for the next 15-min round (Task 56+)**:
+  1. Real Arabic i18n with `next-intl` (RTL layout, translated UI strings) — still the top remaining follow-up.
+  2. Apply `nm-shimmer` to all skeleton loading states.
+  3. Pose-server logging: configure uvicorn's log handlers so WS messages reach server.log.
+  4. Goal-progress sparkline in the goals tracker (the progress bar is there but no per-session sparkline).
+  5. Full E2E confetti test (set a new unachieved goal, save a session that exceeds it).
