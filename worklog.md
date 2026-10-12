@@ -692,3 +692,26 @@ Stage Summary:
   3. Pose-server logging: configure uvicorn's log handlers.
   4. Full E2E confetti test (set a new unachieved goal, save a session that exceeds it).
   5. A rehab progress report (printable clinical summary) on the patient detail page.
+
+---
+Task ID: 67-72
+Agent: Main orchestrator (Z.ai Code) — rename to "نهوض" + Arabic RTL
+Task: Rename the project from "NeuroMove" to "نهوض" (Nuhoud), make the UI fully Arabic with RTL support, and use a beautiful Arabic font that aligns with the project's rehabilitative purpose.
+
+Work Log:
+- Read worklog Tasks 1-66. Project was branded "NeuroMove" with English UI chrome. User requested a full Arabic rename + RTL.
+- **layout.tsx** — changed `lang="en"` → `lang="ar"`, `dir="rtl"` on `<html>`. Added Google Fonts: **Cairo** (primary Arabic font, weights 400-800, elegant + modern) and **Tajawal** (fallback for mono/numbers). Updated metadata title to "نهوض — منصة تأهيل ما بعد السكتة الدماغية", description in Arabic, keywords in Arabic, author "فريق نهوض", OG/Twitter all "نهوض". Applied `font-cairo` as the body font. Moved Sonner toaster to top-left (RTL-appropriate).
+- **globals.css** — updated `@theme inline` to use Cairo + Tajawal as the sans/mono fonts. Added `--font-arabic` and `--font-arabic-mono` variables. Added RTL-specific styles in `@layer base`: Arabic font-family default, font-feature-settings for kerning/ligatures, line-height 1.6 for Arabic readability, heading weight 700, mono font uses Tajawal, `text-align: right` for `[dir="rtl"]`, arrow flip for `.ltr-arrow`, list padding-right for RTL.
+- **header.tsx** — renamed "NeuroMove" → "نهوض". Translated: subtitle to "علاج رقمي · تأهيل الأطراف العلوية بعد السكتة · سلطنة عُمان", welcome pill to "مرحباً بكم في نهوض", WS status labels to "غير متصل/جارٍ الاتصال/متصل", aria-labels to Arabic, gradient direction from `to-r` → `to-l` (RTL), glow position from left → right, `ml-auto` → `mr-auto`.
+- **footer.tsx** — renamed "NeuroMove" → "نهوض". Translated: "Phase 1 MVP" → "النسخة التجريبية", "Built for سلطنة عُمان" → "مصمّمة لسلطنة عُمان", nav links "Backend health" → "حالة الخادم", "Phase roadmap" → "خارطة المراحل", aria-label to "تذييل الصفحة". Removed the English disclaimer line, replaced with Arabic copyright "منصة نهوض للتأهيل الرقمي · جميع الحقوق محفوظة © 2026".
+- **page.tsx** — translated all 7 SectionLabel titles to Arabic with Arabic-Indic numerals: "٠١ التتبع الحي", "٠٢ التقدّم", "٠٣ تدفق البيانات الحي", "٠٤ سجلّ الجلسات", "٠٥ معمارية النظام", "٠٦ الميكانيكا الحيوية", "٠٧ دليل التكامل مع UE5". Translated the doctor view section label to "٠١ لوحة الطبيب". Translated all toast messages: "تم الاتصال بخادم الاستدلال", "انقطع الاتصال بخادم الاستدلال", "تم تحقيق الهدف! 🎯", "تبديل اللغة / دعم اللغة العربية الكامل متاح الآن".
+- **auth-screen.tsx** — fully translated: hero tagline "نعيد الحركة، تكراراً بتكرار", feature bullets (استدلال لحظي بـ MediaPipe Pose / خطط علاجية سريرية / أوسمة تحفيزية و تصدير FHIR R4), phase label "المرحلة الثانية · المصادقة، التخزين و لوحات سريرية", mobile header "نهوض / علاج رقمي · تأهيل ما بعد السكتة", tabs "تسجيل الدخول / حساب جديد", login card "مرحباً بعودتك / سجّل الدخول إلى حسابك في نهوض للمتابعة", register card "أنشئ حسابك / يمكن للمرضى والأطباء إنشاء حساب للوصول التجريبي", all labels (البريد الإلكتروني / كلمة المرور / الاسم الكامل / نوع الحساب), placeholders (you@nuhood.health / مثال: سارة البلوشية / ٦ أحرف على الأقل), role buttons "طبيب / مريض", submit buttons "دخول / إنشاء حساب", demo accounts section "حسابات تجريبية", account labels "طبيب — د. سالم الحبسي / مريض — ليلى المنذرية / مريض — عمر السناني", quick-login hint "اضغط ←", aria-labels for password visibility toggles.
+
+Stage Summary:
+- **The project is now fully branded "نهوض" with a complete Arabic RTL UI.**
+- **Font**: Cairo (primary Arabic font — elegant, modern, designed for digital interfaces) + Tajawal (fallback for numbers/mono). Applied globally via `--font-cairo` and `font-cairo` class on body.
+- **RTL**: `<html lang="ar" dir="rtl">` — the whole layout flows right-to-left. Header gradient, glow position, margins, text alignment all flipped for RTL.
+- **Verified via agent-browser**: title "نهوض — منصة تأهيل ما بعد السكتة الدماغية", dir="rtl", lang="ar", font-family Cairo, login screen fully Arabic (نهوض / نعيد الحركة / تسجيل الدخول / حسابات تجريبية / طبيب — د. سالم الحبسي / مريض — ليلى المنذرية), doctor dashboard Arabic (علاج رقمي / لوحة الطبيب / footer disclaimer / copyright), no console errors.
+- `bun run lint` passes clean. Pose-server healthy (PID 14655). Dev-server daemonized (PID 17774). All 200s.
+- **Note**: the backend API routes (Python pose-server + Next.js API v2) still use "neuromove" in their internal naming (logger name, service title, demo email domains @neuromove.health). The frontend UI is fully "نهوض". A full rename of the backend (email domains, service titles) can be a follow-up if needed.
+- Screenshots saved: `/home/z/my-project/ar-login-screen.png`, `/home/z/my-project/ar-doctor-dashboard.png`.

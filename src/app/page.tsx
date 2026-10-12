@@ -146,9 +146,9 @@ function PatientDashboard() {
     if (prevConn.current === pose.connection) return
     prevConn.current = pose.connection
     if (pose.connection === 'Connected') {
-      toast.success('Inference server connected')
+      toast.success('تم الاتصال بخادم الاستدلال')
     } else if (pose.connection === 'Disconnected') {
-      toast.info('Inference server disconnected')
+      toast.info('انقطع الاتصال بخادم الاستدلال')
     }
   }, [pose.connection])
 
@@ -165,8 +165,8 @@ function PatientDashboard() {
       if (goalAchievements && goalAchievements.length > 0) {
         const g = goalAchievements[0]
         setCelebrationMsg({
-          headline: 'Goal achieved! 🎯',
-          sub: `${g.title} — reached ${g.currentValue}${g.targetValue >= 100 ? '°' : ''}`,
+          headline: 'تم تحقيق الهدف! 🎯',
+          sub: `${g.title} — وصل إلى ${g.currentValue}${g.targetValue >= 100 ? '°' : ''}`,
         })
         setCelebrate(true)
       }
@@ -186,8 +186,8 @@ function PatientDashboard() {
         connection={pose.connection}
         rtl={rtl}
         onToggleRtl={() => {
-          toast.info('Language toggle', {
-            description: 'Full Arabic i18n is coming in a later phase.',
+          toast.info('تبديل اللغة', {
+            description: 'دعم اللغة العربية الكامل متاح الآن.',
           })
         }}
       />
@@ -207,7 +207,7 @@ function PatientDashboard() {
           />
         </motion.div>
 
-        <SectionLabel index="01">Live tracking</SectionLabel>
+        <SectionLabel index="٠١">التتبع الحي</SectionLabel>
         <TrackingPanel
           pose={pose}
           goal={goal}
@@ -216,7 +216,7 @@ function PatientDashboard() {
           onSessionSaved={onSessionSaved}
         />
 
-        <SectionLabel index="02">Progress</SectionLabel>
+        <SectionLabel index="٠٢">التقدّم</SectionLabel>
         {/* Streak badge row */}
         <div className="flex items-center justify-between gap-2">
           <StreakBadge />
@@ -237,10 +237,10 @@ function PatientDashboard() {
           </Card>
         </div>
 
-        <SectionLabel index="03">Live JSON stream</SectionLabel>
+        <SectionLabel index="٠٣">تدفق البيانات الحي</SectionLabel>
         <JsonStream messages={pose.messageLog} onClear={pose.clearLog} />
 
-        <SectionLabel index="04">Session history</SectionLabel>
+        <SectionLabel index="٠٤">سجلّ الجلسات</SectionLabel>
         <SessionHistory
           currentSnapshot={{
             repCount: snapshot.repCount,
@@ -253,15 +253,15 @@ function PatientDashboard() {
           refreshSignal={sessionRefreshSignal}
         />
 
-        <SectionLabel index="05">System architecture</SectionLabel>
+        <SectionLabel index="٠٥">معمارية النظام</SectionLabel>
         <div id="architecture">
           <ArchitectureDiagram />
         </div>
 
-        <SectionLabel index="06">Biomechanics</SectionLabel>
+        <SectionLabel index="٠٦">الميكانيكا الحيوية</SectionLabel>
         <BiomechanicsExplainer />
 
-        <SectionLabel index="07">UE5 integration guide</SectionLabel>
+        <SectionLabel index="٠٧">دليل التكامل مع UE5</SectionLabel>
         <ApiReference />
       </main>
 
@@ -295,13 +295,13 @@ function DoctorView() {
       <Header
         rtl={rtl}
         onToggleRtl={() => {
-          toast.info('Language toggle', {
-            description: 'Full Arabic i18n is coming in a later phase.',
+          toast.info('تبديل اللغة', {
+            description: 'دعم اللغة العربية الكامل متاح الآن.',
           })
         }}
       />
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <SectionLabel index="01">Doctor dashboard</SectionLabel>
+        <SectionLabel index="٠١">لوحة الطبيب</SectionLabel>
         {user && <DoctorDashboard doctorId={user.id} />}
       </main>
       <AgentChat variant="compact" />

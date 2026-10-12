@@ -66,14 +66,10 @@ function NeuroMoveLogo({ className }: { className?: string }) {
 }
 
 /**
- * Header — sticky top bar. When the user is authenticated (Phase 2) we show
- * the gradient header background + the UserMenu (avatar + role + logout)
- * alongside the existing language/theme toggles. When not authenticated we
- * render a slimmer version (just the brand + toggles) — the AuthScreen owns
- * the rest of the viewport in that case.
+ * Header — شريط علوي ثابت. عند تسجيل الدخول نعرض خلفية متدرجة + قائمة المستخدم
+ * مع أزرار تبديل اللغة والسمة. عند عدم تسجيل الدخول نعرض نسخة أبسط.
  *
- * The header background uses a subtle dark gradient with a faint radial teal
- * glow behind the logo for visual depth.
+ * الخلفية تستخدم تدرجاً داكناً مع توهج تيل خفيف خلف الشعار لإضفاء عمق بصري.
  */
 export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
   const { theme, setTheme } = useTheme()
@@ -88,22 +84,22 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
   }
 
   const statusLabel: Record<WsConnectionState, string> = {
-    Disconnected: 'Disconnected',
-    Connecting: 'Connecting',
-    Connected: 'Connected',
+    Disconnected: 'غير متصل',
+    Connecting: 'جارٍ الاتصال',
+    Connected: 'متصل',
   }
 
   return (
     <header
       className={cn(
         'sticky top-0 z-40 w-full border-b border-border/60 backdrop-blur-md supports-[backdrop-filter]:bg-background/70',
-        // Subtle gradient overlay (works in both light and dark mode)
-        'bg-gradient-to-r from-slate-50 via-background to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950',
+        // تدرج خفيف يعمل في الوضعين الفاتح والداكن
+        'bg-gradient-to-l from-slate-50 via-background to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950',
       )}
     >
-      {/* radial teal glow behind the logo */}
+      {/* توهج تيل خلف الشعار */}
       <div
-        className="pointer-events-none absolute top-1/2 left-2 h-24 w-24 -translate-y-1/2 rounded-full opacity-40 blur-2xl sm:left-6"
+        className="pointer-events-none absolute top-1/2 right-2 h-24 w-24 -translate-y-1/2 rounded-full opacity-40 blur-2xl sm:right-6"
         style={{
           background:
             'radial-gradient(circle at center, rgba(20,184,166,0.45), transparent 70%)',
@@ -123,27 +119,26 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
           </motion.div>
           <div className="flex flex-col">
             <span className="text-base font-bold tracking-tight text-foreground sm:text-lg">
-              NeuroMove
+              نهوض
             </span>
             <span className="text-[10px] leading-tight text-muted-foreground sm:text-xs">
-              Digital Therapeutic · post-stroke upper-limb rehab · سلطنة عُمان
+              علاج رقمي · تأهيل الأطراف العلوية بعد السكتة · سلطنة عُمان
             </span>
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Hide the language pill when authenticated — UserMenu is more useful. */}
+        <div className="mr-auto flex items-center gap-2">
+          {/* إخفاء شارة اللغة عند تسجيل الدخول — قائمة المستخدم أهم */}
           {!user && (
             <Badge
               variant="outline"
               className={cn(
                 'hidden gap-1.5 border-border/60 px-2.5 py-1 text-xs font-medium sm:inline-flex',
-                rtl && 'flex-row-reverse',
               )}
-              aria-label={`Demo text direction: ${rtl ? 'RTL Arabic' : 'LTR English'}`}
+              aria-label={`اتجاه النص: ${rtl ? 'عربي RTL' : 'إنجليزي LTR'}`}
             >
-              <span className={cn('text-foreground', rtl && 'font-arabic')}>
-                {rtl ? 'مرحباً بكم في NeuroMove' : 'Welcome to NeuroMove'}
+              <span className="text-foreground">
+                مرحباً بكم في نهوض
               </span>
             </Badge>
           )}
@@ -153,7 +148,7 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
             size="sm"
             onClick={onToggleRtl}
             className="h-9 gap-1.5 px-3 text-xs"
-            aria-label="Toggle language between English and Arabic"
+            aria-label="تبديل اللغة بين العربية والإنجليزية"
           >
             <Languages className="h-4 w-4" aria-hidden="true" />
             <span>{rtl ? 'عربي' : 'EN'}</span>
@@ -166,7 +161,7 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
             size="icon"
             className="h-9 w-9"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            aria-label="Toggle dark mode"
+            aria-label="تبديل الوضع الليلي"
           >
             {mounted ? (
               theme === 'dark' ? (
@@ -179,8 +174,7 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
             )}
           </Button>
 
-          {/* WS status pill — only shown when a connection state is provided
-              (the doctor view doesn't have a tracking panel, so it omits it). */}
+          {/* شارة حالة الاتصال — تظهر فقط عند توفير حالة الاتصال */}
           {user && connection && (
             <div
               className="hidden items-center gap-2 rounded-full border border-border/60 bg-card/40 px-3 py-1.5 text-xs font-medium md:inline-flex"

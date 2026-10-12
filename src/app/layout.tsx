@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Cairo, Tajawal } from "next/font/google";
 import "./globals.css";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/neuromove/theme-provider";
@@ -14,33 +14,49 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Cairo — خط عربي حديث مصمم للواجهات الرقمية. أنيق وواضح.
+const cairo = Cairo({
+  variable: "--font-cairo",
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+// Tajawal — خط عربي احتياطي للأرقام والنصوص المختصرة.
+const tajawal = Tajawal({
+  variable: "--font-tajawal",
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "NeuroMove — Post-Stroke Upper-Limb Rehab",
+  title: "نهوض — منصة تأهيل ما بعد السكتة الدماغية",
   description:
-    "NeuroMove is a digital therapeutic platform for post-stroke upper-limb rehabilitation. Real-time AI pose tracking, biomechanics feedback, and gamified rehab exercises. Built for سلطنة عُمان.",
+    "نهوض منصة علاج رقمية لتأهيل الأطراف العلوية بعد السكتة الدماغية. تتبع حركي لحظي بالذكاء الاصطناعي، تغذية راجعة حركية، وتمارين تأهيل تفاعلية. مصممة لسلطنة عُمان.",
   keywords: [
-    "NeuroMove",
-    "stroke rehabilitation",
-    "upper-limb rehab",
+    "نهوض",
+    "تأهيل السكتة الدماغية",
+    "تأهيل الأطراف العلوية",
     "MediaPipe Pose",
-    "biomechanics",
-    "Oman",
-    "digital therapeutic",
+    "الميكانيكا الحيوية",
+    "عمان",
+    "علاج رقمي",
   ],
-  authors: [{ name: "NeuroMove Team" }],
+  authors: [{ name: "فريق نهوض" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "NeuroMove",
-    description: "Post-stroke upper-limb rehabilitation · Real-time AI",
-    siteName: "NeuroMove",
+    title: "نهوض",
+    description: "تأهيل الأطراف العلوية بعد السكتة الدماغية · ذكاء اصطناعي لحظي",
+    siteName: "نهوض",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "NeuroMove",
-    description: "Post-stroke upper-limb rehabilitation · Real-time AI",
+    title: "نهوض",
+    description: "تأهيل الأطراف العلوية بعد السكتة الدماغية · ذكاء اصطناعي لحظي",
   },
 };
 
@@ -50,9 +66,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${cairo.variable} ${tajawal.variable} font-cairo antialiased bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
@@ -61,7 +77,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <SonnerToaster position="top-right" richColors closeButton />
+          <SonnerToaster position="top-left" richColors closeButton dir="rtl" />
         </ThemeProvider>
       </body>
     </html>

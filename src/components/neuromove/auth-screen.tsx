@@ -31,7 +31,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const DEMO_ACCOUNTS = [
   {
-    label: 'Doctor — د. سالم الحبسي',
+    label: 'طبيب — د. سالم الحبسي',
     email: 'doctor@neuromove.health',
     password: 'demo1234',
     role: 'DOCTOR' as const,
@@ -39,7 +39,7 @@ const DEMO_ACCOUNTS = [
     accent: 'text-amber-500',
   },
   {
-    label: 'Patient — ليلى المنذرية',
+    label: 'مريض — ليلى المنذرية',
     email: 'layla@neuromove.health',
     password: 'demo1234',
     role: 'PATIENT' as const,
@@ -47,7 +47,7 @@ const DEMO_ACCOUNTS = [
     accent: 'text-teal-500',
   },
   {
-    label: 'Patient — عمر السناني',
+    label: 'مريض — عمر السناني',
     email: 'omar@neuromove.health',
     password: 'demo1234',
     role: 'PATIENT' as const,
@@ -197,32 +197,32 @@ export function AuthScreen() {
           className="relative z-10 flex flex-col gap-4"
         >
           <h1 className="max-w-md text-4xl font-bold leading-tight text-white">
-            Restoring movement,{' '}
+            نعيد الحركة،{' '}
             <span className="bg-gradient-to-r from-teal-300 to-emerald-300 bg-clip-text text-transparent">
-              one rep at a time
+              تكراراً بتكرار
             </span>
             .
           </h1>
           <p className="max-w-md text-sm leading-relaxed text-slate-300">
-            Real-time AI pose tracking, biomechanics feedback, gamified
-            rehabilitation exercises, and HL7 FHIR-ready session exports —
-            built for سلطنة عُمان.
+            تتبع حركي لحظي بالذكاء الاصطناعي، تغذية راجعة حركية، تمارين تأهيل
+            تفاعلية، وتصدير جلسات جاهز لمعيار HL7 FHIR —
+            مصمّم لسلطنة عُمان.
           </p>
           <ul className="flex flex-col gap-2 text-sm text-slate-300">
             <li className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-teal-400" /> Live MediaPipe Pose inference
+              <Sparkles className="h-4 w-4 text-teal-400" /> استدلال لحظي بـ MediaPipe Pose
             </li>
             <li className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-teal-400" /> Clinical treatment plans + 7-day activity trends
+              <Sparkles className="h-4 w-4 text-teal-400" /> خطط علاجية سريرية + اتجاهات نشاط 7 أيام
             </li>
             <li className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-teal-400" /> Gamification badges & FHIR R4 export
+              <Sparkles className="h-4 w-4 text-teal-400" /> أوسمة تحفيزية و تصدير FHIR R4
             </li>
           </ul>
         </motion.div>
 
         <div className="relative z-10 text-xs text-slate-500">
-          Phase 2 · Authentication, persistence & clinical dashboards
+          المرحلة الثانية · المصادقة، التخزين و لوحات سريرية
         </div>
       </div>
 
@@ -235,9 +235,9 @@ export function AuthScreen() {
               <NeuronMark className="h-9 w-9" />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-bold tracking-tight">NeuroMove</span>
+              <span className="text-lg font-bold tracking-tight">نهوض</span>
               <span className="text-[10px] text-muted-foreground">
-                Digital Therapeutic · post-stroke rehab
+                علاج رقمي · تأهيل ما بعد السكتة
               </span>
             </div>
           </div>
@@ -245,10 +245,10 @@ export function AuthScreen() {
           <Tabs value={tab} onValueChange={(v) => setTab(v as 'login' | 'register')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login" className="gap-1.5">
-                <LogIn className="h-3.5 w-3.5" /> Sign in
+                <LogIn className="h-3.5 w-3.5" /> تسجيل الدخول
               </TabsTrigger>
               <TabsTrigger value="register" className="gap-1.5">
-                <UserPlus className="h-3.5 w-3.5" /> Register
+                <UserPlus className="h-3.5 w-3.5" /> حساب جديد
               </TabsTrigger>
             </TabsList>
 
@@ -256,20 +256,20 @@ export function AuthScreen() {
             <TabsContent value="login">
               <Card className="border-border/40 bg-card/60 shadow-lg shadow-black/20 backdrop-blur">
                 <CardHeader>
-                  <CardTitle className="text-xl">Welcome back</CardTitle>
+                  <CardTitle className="text-xl">مرحباً بعودتك</CardTitle>
                   <CardDescription>
-                    Sign in to your NeuroMove account to continue.
+                    سجّل الدخول إلى حسابك في نهوض للمتابعة.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleLogin} className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="login-email">Email</Label>
+                      <Label htmlFor="login-email">البريد الإلكتروني</Label>
                       <Input
                         id="login-email"
                         type="email"
                         autoComplete="email"
-                        placeholder="you@neuromove.health"
+                        placeholder="you@nuhood.health"
                         value={loginEmail}
                         onChange={(e) => setLoginEmail(e.target.value)}
                         disabled={loginBusy}
@@ -277,7 +277,7 @@ export function AuthScreen() {
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="login-pw">Password</Label>
+                      <Label htmlFor="login-pw">كلمة المرور</Label>
                       <div className="relative">
                         <Input
                           id="login-pw"
@@ -294,7 +294,7 @@ export function AuthScreen() {
                           type="button"
                           onClick={() => setShowLoginPw((s) => !s)}
                           className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
-                          aria-label={showLoginPw ? 'Hide password' : 'Show password'}
+                          aria-label={showLoginPw ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                         >
                           {showLoginPw ? (
                             <EyeOff className="h-4 w-4" />
@@ -314,7 +314,7 @@ export function AuthScreen() {
                       ) : (
                         <LogIn className="h-4 w-4" />
                       )}
-                      Sign in
+                      دخول
                     </Button>
                   </form>
 
@@ -327,19 +327,19 @@ export function AuthScreen() {
             <TabsContent value="register">
               <Card className="border-border/40 bg-card/60 shadow-lg shadow-black/20 backdrop-blur">
                 <CardHeader>
-                  <CardTitle className="text-xl">Create your account</CardTitle>
+                  <CardTitle className="text-xl">أنشئ حسابك</CardTitle>
                   <CardDescription>
-                    Patients and clinicians can self-register for the sandbox.
+                    يمكن للمرضى والأطباء إنشاء حساب للوصول التجريبي.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleRegister} className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="reg-name">Full name</Label>
+                      <Label htmlFor="reg-name">الاسم الكامل</Label>
                       <Input
                         id="reg-name"
                         autoComplete="name"
-                        placeholder="e.g. Sara Al-Balushi"
+                        placeholder="مثال: سارة البلوشية"
                         value={regName}
                         onChange={(e) => setRegName(e.target.value)}
                         disabled={regBusy}
@@ -347,12 +347,12 @@ export function AuthScreen() {
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="reg-email">Email</Label>
+                      <Label htmlFor="reg-email">البريد الإلكتروني</Label>
                       <Input
                         id="reg-email"
                         type="email"
                         autoComplete="email"
-                        placeholder="you@neuromove.health"
+                        placeholder="you@nuhood.health"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         disabled={regBusy}
@@ -360,13 +360,13 @@ export function AuthScreen() {
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="reg-pw">Password</Label>
+                      <Label htmlFor="reg-pw">كلمة المرور</Label>
                       <div className="relative">
                         <Input
                           id="reg-pw"
                           type={showRegPw ? 'text' : 'password'}
                           autoComplete="new-password"
-                          placeholder="min 6 characters"
+                          placeholder="٦ أحرف على الأقل"
                           value={regPassword}
                           onChange={(e) => setRegPassword(e.target.value)}
                           disabled={regBusy}
@@ -377,7 +377,7 @@ export function AuthScreen() {
                           type="button"
                           onClick={() => setShowRegPw((s) => !s)}
                           className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
-                          aria-label={showRegPw ? 'Hide password' : 'Show password'}
+                          aria-label={showRegPw ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                         >
                           {showRegPw ? (
                             <EyeOff className="h-4 w-4" />
@@ -388,7 +388,7 @@ export function AuthScreen() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <Label>Account type</Label>
+                      <Label>نوع الحساب</Label>
                       <div className="grid grid-cols-2 gap-2">
                         {(['PATIENT', 'DOCTOR'] as const).map((r) => (
                           <button
@@ -407,7 +407,7 @@ export function AuthScreen() {
                             ) : (
                               <UserRound className="h-3.5 w-3.5" />
                             )}
-                            {r === 'DOCTOR' ? 'Doctor' : 'Patient'}
+                            {r === 'DOCTOR' ? 'طبيب' : 'مريض'}
                           </button>
                         ))}
                       </div>
@@ -422,7 +422,7 @@ export function AuthScreen() {
                       ) : (
                         <UserPlus className="h-4 w-4" />
                       )}
-                      Create account
+                      إنشاء حساب
                     </Button>
                   </form>
                 </CardContent>
@@ -448,7 +448,7 @@ function DemoQuickLogin({
       <div className="flex items-center gap-2">
         <div className="h-px flex-1 bg-border/60" />
         <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-          Demo accounts
+          حسابات تجريبية
         </span>
         <div className="h-px flex-1 bg-border/60" />
       </div>
@@ -466,7 +466,7 @@ function DemoQuickLogin({
               <Icon className={cn('h-3.5 w-3.5', acc.accent)} />
               <span className="font-medium text-foreground">{acc.label}</span>
               <span className="ml-auto text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                click →
+                اضغط ←
               </span>
             </button>
           )
