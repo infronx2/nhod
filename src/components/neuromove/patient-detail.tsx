@@ -13,6 +13,7 @@ import {
   FileJson,
   RotateCw,
   CalendarDays,
+  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -47,6 +48,7 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
+import { AgentChat } from '@/components/neuromove/agent-chat'
 import type {
   V2PatientDetail,
   V2Stats,
@@ -120,6 +122,7 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
   const [planDialogOpen, setPlanDialogOpen] = React.useState(false)
   const [fhirSessionId, setFhirSessionId] = React.useState<string | null>(null)
   const [fhirOpen, setFhirOpen] = React.useState(false)
+  const [coachOpen, setCoachOpen] = React.useState(false)
 
   const fetchDetail = React.useCallback(async () => {
     setLoading(true)
@@ -243,7 +246,25 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
           <RotateCw className="h-3.5 w-3.5" />
           Refresh
         </Button>
+        <Button
+          size="sm"
+          className={cn(
+            'h-9 gap-1.5',
+            coachOpen
+              ? 'bg-rose-500 text-rose-50 hover:bg-rose-600'
+              : 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white hover:from-teal-600 hover:to-emerald-700',
+          )}
+          onClick={() => setCoachOpen((v) => !v)}
+          aria-pressed={coachOpen}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          {coachOpen ? 'Close coach' : 'Coach patient'}
+        </Button>
       </div>
+
+      {coachOpen && (
+        <AgentChat patientId={patientId} patientName={detail?.patient.name} variant="embedded" />
+      )}
 
       {/* ---------- Active plan card ---------- */}
       <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-6">

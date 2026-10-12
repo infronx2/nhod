@@ -18,6 +18,7 @@ import { DoctorDashboard } from '@/components/neuromove/doctor-dashboard'
 import { PatientHeader } from '@/components/neuromove/patient-header'
 import { BadgesPanel } from '@/components/neuromove/badges-panel'
 import { ActivityChart } from '@/components/neuromove/activity-chart'
+import { AgentChat } from '@/components/neuromove/agent-chat'
 import { Card } from '@/components/ui/card'
 import { usePoseTracking } from '@/hooks/use-pose-tracking'
 import { useAuth, AuthProvider } from '@/hooks/use-auth'
@@ -234,6 +235,7 @@ function PatientDashboard() {
         <ApiReference />
       </main>
 
+      <AgentChat variant="compact" />
       <Footer rtl={rtl} />
     </div>
   )
@@ -263,6 +265,7 @@ function DoctorView() {
         <SectionLabel index="01">Doctor dashboard</SectionLabel>
         {user && <DoctorDashboard doctorId={user.id} />}
       </main>
+      <AgentChat variant="compact" />
       <Footer rtl={rtl} />
     </div>
   )

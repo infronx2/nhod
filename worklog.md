@@ -289,3 +289,49 @@ Stage Summary:
   4. Reduce Prisma query log verbosity (currently `log: ['query']` floods dev.log) — change to `['warn','error']`.
   5. Add a `mini-services/pose-server` ↔ Next.js sync: when the Python backend completes a WS session, it could POST the summary to `/api/v2/sessions` automatically (currently only the frontend triggers saves).
   6. The prescribe-plan dialog's title field couldn't be filled by agent-browser (likely a Textarea component) — verify it's keyboard-accessible.
+
+---
+Task ID: 13-19
+Agent: webDevReview cron (round 2, 15-min recurring review)
+Task: Assess project status, run agent-browser QA, fix bugs, advance Phase 3 (LangChain-style agentic AI chat, session-replay timeline visualizer), and polish. Continue from the stable Phase 2 baseline.
+
+Work Log:
+- Read worklog Tasks 1-12. Phase 2 complete (auth, doctor dashboard, FHIR, badges, exercise presets). Open follow-ups: Phase 3 agentic chat, Arabic i18n, session-replay, reduce Prisma logging, dev-server daemonization fix.
+- **QA first**: pose-server healthy (PID 1737, daemonized). Dev server was DOWN (port 3000 refused) — recurring OOM/process-reaping issue from round 1.
+- **Fix 13-b: reduced Prisma log verbosity** — `src/lib/db.ts` changed `log: ['query']` → `log: ['warn', 'error']` to stop the dev.log query flood that contributed to the OOM.
+- **Fix 13-c: wrote `scripts/dev-daemon.py`** — a Python double-fork + `os.setsid()` daemon launcher (mirroring the pose-server's `daemon.py` pattern) so the Next.js dev server is reparented to PID 1 with no controlling TTY and survives across Bash tool invocations. Verified: PID 9337, parent=1, TTY=`?`, survives across multiple separate bash calls (port 3000 returns 200 consistently). This solves the recurring "dev server died between bash calls" blocker from round 1.
+- **Re-ran agent-browser QA**: login screen renders, doctor login → 4 KPI tiles (2 patients, 1 session today, 65% avg accuracy, 172 reps/week) + patient roster, no console errors. Phase 2 stable.
+- **Phase 3 backend (Task 14) — Agentic AI Rehab Coach**:
+  * `src/lib/agent-context.ts` — `buildAgentContext(patientId)` fetches the patient's REAL clinical context (active plan, lifetime stats, recent 5 sessions, earned badges, 7-day activity, relevant exercise presets) and `composeSystemPrompt()` injects it into the LLM system prompt with Arabic-aware instructions. This is the "agentic" pattern via context injection — robust for a small fixed tool set, no round-trip latency, no tool-selection hallucination.
+  * `src/app/api/v2/agent/chat/route.ts` — `POST /api/v2/agent/chat` (JWT-auth). Body: `{message, patientId?}`. Doctors must specify patientId; patients default to self. Calls `z-ai-web-dev-sdk` server-side (`await ZAI.create()` + `zai.chat.completions.create({messages, thinking:{type:'disabled'}})`). Maintains in-memory conversation history per (user→patient) pair (cap 20). Graceful fallback if the LLM is unavailable (returns a data-driven summary so the chat never dead-ends). `DELETE` clears history.
+  * Verified: Arabic prompt "أنا تعبان، ليش أمر يدي لين ورا؟" → Omani-Arabic reply "يا ليلى، أقدر أحس إرهاقك. ممكن نحط الهدف اليوم لـ 5 تكرارات بس بدل 10..." referencing real plan. English "How am I doing compared to my plan?" → "Your plan targets 90° flexion with 20 reps/day, and you're averaging 11 reps/day... 88% accuracy" — all real numbers.
+- **Phase 3 frontend (Task 15) — AgentChat panel**:
+  * `src/components/neuromove/agent-chat.tsx` — floating button (bottom-right, gradient teal→emerald with pulsing amber dot) + slide-in panel. Three variants: `compact` (fixed 22rem), `full` (larger fixed), `embedded` (inline in page flow, no floating button — for the doctor's patient-detail "Coach patient" toggle). Features: message bubbles with user/assistant avatars, typing indicator (3 bouncing dots), suggested-prompt buttons (4 starters), tool-usage badges per reply, Arabic RTL auto-detection per message, clear-conversation button, Enter-to-send (Shift+Enter for newline). In-memory conversation persists across open/close within the session.
+  * Wired into `page.tsx`: patient dashboard gets `<AgentChat variant="compact" />` (floating), DoctorView gets `<AgentChat variant="compact" />` (floating, for roster-level coaching). Patient-detail gets a "Coach patient" toggle button that mounts `<AgentChat patientId={id} variant="embedded" />` inline.
+  * Fixed a duplicate-instance bug: initially both the DoctorView wrapper and the patient-detail rendered a floating AgentChat (2 floating buttons, 0 textareas — the patient-detail's internal `open` state was false). Solved by adding the `embedded` variant that renders inline without a floating button, and using it for the patient-detail case.
+- **Feature (Task 16) — Session-replay timeline visualizer**:
+  * `src/app/api/v2/sessions/[id]/route.ts` — new GET endpoint returning the full session record including the `angleTimeline` JSON (per-frame elbow angles at ~10 fps).
+  * `src/components/neuromove/session-replay.tsx` — `SessionReplay` component: decodes the angleTimeline JSON, renders a recharts line chart (angle vs frame, 0-180° Y axis, target reference line in amber, red cursor marker), with Play/Pause/Restart controls and a range scrubber. Playback advances at ~10 fps to match recording. Shows current frame, angle readout, elapsed/total time. Empty state for sessions without a timeline.
+  * Enhanced `src/components/neuromove/fhir-viewer.tsx` — added a "Replay" tab alongside the existing "FHIR R4" tab. The dialog now has two tabs: FHIR JSON (syntax-highlighted, copyable, downloadable) and Replay (the SessionReplay chart, lazy-loaded when the tab opens). Renamed the dialog title to "Session detail".
+  * Verified: created a session with a 100-sample sine-wave angleTimeline via the API. Opened the session dialog → Replay tab → chart rendered (`.recharts-surface` present), "20.0° frame 0 of 100, 0.0s / 10.0s", Play button + scrubber present. No errors.
+- **Verification (Task 19)** via agent-browser through the gateway at http://localhost:81/:
+  1. Patient login (Layla) → dashboard → floating "Open AI Rehab Coach" button present → click → panel opens ("Ask your AI Rehab Coach") → click suggested prompt "How am I doing this week?" → AI replied with REAL weekly data: "22 reps with 18 correct, reaching 160° max ROM, 82% accuracy, 5 compensation errors". No errors.
+  2. Open session detail dialog → "Replay" tab → timeline chart renders with 100 frames, play/scrub controls. Screenshot saved to `/home/z/my-project/p3-replay-timeline.png`.
+  3. Logout → doctor login → patient detail (Layla) → "Coach patient" button → embedded chat panel renders inline (1 textarea, no duplicate floating buttons) → typed "What should I adjust in this patient plan given the compensation errors?" → AI replied: "Based on ليلى's data (2.0 avg compensation errors/session), I recommend temporarily reducing the target angle... Try the 'Gentle Elbow Flexion' exercise (target 60°)" — it cited the real compensation average AND recommended a specific exercise preset by name. Screenshot saved to `/home/z/my-project/p3-doctor-coaching.png`.
+- `bun run lint` → exit 0, no errors, no warnings.
+
+Stage Summary:
+- **Phase 3 (agentic AI + session replay) is COMPLETE and browser-verified.** NeuroMove now has:
+  * An AI Rehab Coach that knows each patient's real plan, stats, sessions, badges, and relevant exercises, responds in English or Omani Arabic (auto-detected per message), and gives specific clinical advice (e.g. "reduce target to 60°, use the Gentle Elbow Flexion preset").
+  * A session-replay timeline visualizer that plays back the per-frame elbow-angle recording with Play/Pause/Restart + scrubber, in a tabbed dialog alongside the FHIR R4 export.
+  * A robust dev-server daemon (`scripts/dev-daemon.py`) so the Next.js server survives across bash calls (the round-1 blocker is fixed).
+  * Quiet Prisma logging (no more query flood in dev.log).
+- The app is now a 3-tier fullstack platform: (1) Python FastAPI on :8001 for real-time WebSocket pose inference, (2) Next.js API v2 routes (Prisma → SQLite) for persistence/auth/management, (3) z-ai LLM for agentic coaching. All three coexist and the dashboard orchestrates them.
+- `bun run lint` passes clean. Pose-server healthy (PID 1737). Dev-server daemonized (PID 9337, parent 1). Both survive across bash calls. Demo accounts: `doctor@neuromove.health` / `layla@neuromove.health` / `omar@neuromove.health`, all password `demo1234`.
+- **Open follow-ups for the next 15-min round (Task 20+)**:
+  1. Real Arabic i18n with `next-intl` (RTL layout, translated UI strings) — currently the coach responds in Arabic but the UI chrome is English.
+  2. Persist chat conversations to a Prisma `ChatMessage` model so they survive server restarts (currently in-memory per process).
+  3. A real-time notification feed (badge earned, plan prescribed, streak milestone) — the toasts fire but there's no persistent bell-icon history.
+  4. Stats deep-dive: per-limb breakdown, weekly heatmap of activity, compensation-error trend chart.
+  5. The `mini-services/pose-server` ↔ Next.js sync: when the Python backend completes a WS session, POST the summary to `/api/v2/sessions` automatically (currently only the frontend triggers saves, so live-camera sessions without a manual save aren't persisted).
+  6. Polish: animated section transitions, richer empty states, gradient mesh background, improved mobile spacing on the coach panel.

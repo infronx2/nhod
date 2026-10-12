@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Download, Copy, FileJson, Loader2 } from 'lucide-react'
+import { Download, Copy, FileJson, Loader2, Activity } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import { cn } from '@/lib/utils'
+import { SessionReplay } from '@/components/neuromove/session-replay'
 import type { V2FhirResponse } from '@/lib/v2-types'
 
 interface FhirViewerProps {
@@ -22,10 +24,19 @@ interface FhirViewerProps {
   onOpenChange: (open: boolean) => void
 }
 
+interface SessionDetail {
+  id: string
+  angleTimeline: string | null
+  maxAchievedAngle: number
+  durationSeconds: number
+  limb: string
+  sessionDate: string
+}
+
 /**
  * FhirViewer — Dialog that fetches /api/v2/sessions/[id]/fhir and shows the
- * FHIR R4 Observation JSON in a syntax-highlighted, scrollable, copyable
- * viewer with a download button.
+ * FHIR R4 Observation JSON, OR fetches /api/v2/sessions/[id] and shows the
+ * session-replay timeline. Two tabs: "FHIR" and "Replay".
  *
  * The viewer renders client-side only after open, so it never blocks SSR.
  */
@@ -33,7 +44,11 @@ export function FhirViewer({ sessionId, open, onOpenChange }: FhirViewerProps) {
   const [json, setJson] = React.useState<string>('')
   const [loading, setLoading] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
+  const [tab, setTab] = React.useState<'fhir' | 'replay'>('fhir')
+  const [sessionDetail, setSessionDetail] = React.useState<SessionDetail | null>(null)
+  const [sessionLoading, setSessionLoading] = React.useState(false)
 
+  // Fetch FHIR JSON.
   React.useEffect(() => {
     if (!open || !sessionId) return
     let cancelled = false
@@ -56,6 +71,28 @@ export function FhirViewer({ sessionId, open, onOpenChange }: FhirViewerProps) {
       cancelled = true
     }
   }, [open, sessionId])
+
+  // Fetch session detail (for replay) — lazy, only when the Replay tab opens.
+  React.useEffect(() => {
+    if (!open || !sessionId || tab !== 'replay' || sessionDetail) return
+    let cancelled = false
+    setSessionLoading(true)
+    apiFetch<{ ok: boolean; session: SessionDetail }>(`/api/v2/sessions/${sessionId}`)
+      .then((data) => {
+        if (cancelled) return
+        setSessionDetail(data.session)
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : 'Failed to load session'
+        toast.error('Session load failed', { description: msg })
+      })
+      .finally(() => {
+        if (!cancelled) setSessionLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, sessionId, tab, sessionDetail])
 
   const handleCopy = async () => {
     try {
@@ -88,55 +125,111 @@ export function FhirViewer({ sessionId, open, onOpenChange }: FhirViewerProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileJson className="h-5 w-5 text-teal-500" />
-            FHIR R4 Observation
+            Session detail
           </DialogTitle>
           <DialogDescription>
-            HL7 FHIR R4 Observation resource for session{' '}
+            Session{' '}
             <code className="rounded bg-muted px-1 py-0.5 text-[10px]">
               {sessionId}
             </code>
-            . LOINC 71033-6 (Upper extremity ROM). Ready to POST to an EHR.
+            — view the HL7 FHIR R4 Observation or replay the angle timeline.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="nm-scroll-thin max-h-[60vh] overflow-auto rounded-md border border-border/40 bg-slate-950 p-3">
-          {loading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <Skeleton key={i} className="h-3 w-full" style={{ width: `${60 + ((i * 13) % 40)}%` }} />
-              ))}
-              <div className="mt-2 flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading FHIR payload…
-              </div>
-            </div>
-          ) : (
-            <pre className="text-[11px] leading-relaxed">
-              <code dangerouslySetInnerHTML={{ __html: highlightFhir(json) }} />
-            </pre>
-          )}
+        {/* Tabs */}
+        <div className="flex gap-1 rounded-lg border border-border/40 bg-muted/30 p-1">
+          <button
+            onClick={() => setTab('fhir')}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+              tab === 'fhir'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <FileJson className="h-3.5 w-3.5" />
+            FHIR R4
+          </button>
+          <button
+            onClick={() => setTab('replay')}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+              tab === 'replay'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Activity className="h-3.5 w-3.5" />
+            Replay
+          </button>
         </div>
 
+        {/* Tab content */}
+        {tab === 'fhir' ? (
+          <div className="nm-scroll-thin max-h-[55vh] overflow-auto rounded-md border border-border/40 bg-slate-950 p-3">
+            {loading ? (
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <Skeleton key={i} className="h-3 w-full" style={{ width: `${60 + ((i * 13) % 40)}%` }} />
+                ))}
+                <div className="mt-2 flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading FHIR payload…
+                </div>
+              </div>
+            ) : (
+              <pre className="text-[11px] leading-relaxed">
+                <code dangerouslySetInnerHTML={{ __html: highlightFhir(json) }} />
+              </pre>
+            )}
+          </div>
+        ) : (
+          <div className="max-h-[55vh] overflow-auto rounded-md border border-border/40 bg-card/40 p-3">
+            {sessionLoading ? (
+              <div className="flex flex-col gap-3 py-8">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-8 w-40" />
+                <Skeleton className="h-6 w-full" />
+              </div>
+            ) : sessionDetail ? (
+              <SessionReplay
+                angleTimelineJson={sessionDetail.angleTimeline}
+                maxAngle={sessionDetail.maxAchievedAngle}
+                durationSeconds={sessionDetail.durationSeconds}
+              />
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Could not load session data.
+              </p>
+            )}
+          </div>
+        )}
+
         <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopy}
-            disabled={loading || !json}
-            className="gap-1.5"
-          >
-            <Copy className="h-3.5 w-3.5" />
-            {copied ? 'Copied!' : 'Copy JSON'}
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleDownload}
-            disabled={loading || !json}
-            className="gap-1.5 bg-teal-600 text-white hover:bg-teal-700"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Download .json
-          </Button>
+          {tab === 'fhir' && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopy}
+                disabled={loading || !json}
+                className="gap-1.5"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {copied ? 'Copied!' : 'Copy JSON'}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleDownload}
+                disabled={loading || !json}
+                className="gap-1.5 bg-teal-600 text-white hover:bg-teal-700"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download .json
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
