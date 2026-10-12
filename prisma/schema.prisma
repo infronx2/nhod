@@ -1,11 +1,9 @@
 // Nuhoud Prisma schema
-// Phase 2 data model: users (role-based), treatment_plans, rehab_sessions,
-// exercise presets, achievements. SQLite provider for the sandbox MVP;
-// the same schema runs on PostgreSQL/Supabase in production by flipping
-// the provider + url.
+// PostgreSQL provider for Supabase production.
 
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -16,26 +14,19 @@ datasource db {
 /// A platform user - patient, clinician, or admin.
 model User {
   id               String   @id @default(cuid())
-  /// "PATIENT" | "DOCTOR" | "ADMIN" - String because SQLite has no enum.
   role             String   @default("PATIENT")
   email            String   @unique
   name             String
-  /// bcrypt hash. Null for OAuth-only users (Phase 3).
   passwordHash     String?
-  /// Avatar color seed (hex without #) for the deterministic gradient avatars.
   avatarSeed       String   @default("14b8a6")
   preferredDialect String   @default("omani")
-  /// ISO date of birth, for clinical context.
   dateOfBirth      String?
-  /// Affected side after stroke: "right" | "left" | "bilateral".
   affectedSide     String   @default("right")
   active           Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  /// Plans where this user is the patient.
   plans            TreatmentPlan[] @relation("PatientPlans")
-  /// Plans where this user is the prescribing doctor.
   prescribedPlans  TreatmentPlan[] @relation("DoctorPlans")
   sessions         RehabSession[]
   earnedBadges     EarnedBadge[]
@@ -52,7 +43,6 @@ model TreatmentPlan {
   doctorId        String
   doctor          User     @relation("DoctorPlans", fields: [doctorId], references: [id])
   title           String   @default("Upper-limb rehab plan")
-  /// "upper_right" | "upper_left" | "bilateral"
   targetLimb      String   @default("upper_right")
   targetAngle     Int      @default(90)
   sessionsPerWeek Int      @default(5)
@@ -78,7 +68,6 @@ model RehabSession {
   patient            User     @relation(fields: [patientId], references: [id], onDelete: Cascade)
   planId             String?
   plan               TreatmentPlan? @relation(fields: [planId], references: [id])
-  /// "live" = real webcam, "demo" = simulator
   source             String   @default("demo")
   limb               String   @default("right")
   sessionDate       DateTime @default(now())
@@ -88,7 +77,6 @@ model RehabSession {
   maxAchievedAngle   Float    @default(0)
   compensationErrors Int      @default(0)
   gamificationScore  Int      @default(0)
-  /// Per-frame angle samples (JSON array of floats) for session replay.
   angleTimeline      String?
   createdAt          DateTime @default(now())
 
@@ -100,18 +88,14 @@ model RehabSession {
 /// Library of clinical exercise presets the doctor can prescribe.
 model ExercisePreset {
   id          String   @id @default(cuid())
-  /// Stable slug used by the frontend, e.g. "elbow_flexion_90".
   slug        String   @unique
   name        String
   nameAr      String?
   description String
-  /// "elbow" | "shoulder" | "wrist"
   joint       String   @default("elbow")
   limb        String   @default("right")
   targetAngle Int      @default(90)
-  /// "beginner" | "intermediate" | "advanced"
   difficulty  String   @default("beginner")
-  /// Suggested weekly sessions for this preset.
   sessionsPerWeek Int   @default(5)
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -122,7 +106,6 @@ model EarnedBadge {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// "first_session" | "ten_reps" | "perfect_form" | "streak_3" | ...
   slug      String
   earnedAt  DateTime @default(now())
 
@@ -130,19 +113,11 @@ model EarnedBadge {
   @@index([userId])
 }
 
-/// Persisted AI coach chat messages — one row per turn. Replaces the
-/// in-memory conversation store so history survives server restarts.
-/// A conversation is identified by (speakerId, patientId): the speaker
-/// is whoever sent the message (patient themselves OR a doctor coaching
-/// them), and patientId is whose clinical context was injected.
+/// Persisted AI coach chat messages.
 model ChatMessage {
   id          String   @id @default(cuid())
-  /// Who sent this turn: the patient or the doctor.
   speakerId   String
-  /// Whose clinical context the agent used (== speakerId for a patient
-  /// coaching themselves; the coached patient for a doctor).
   patientId   String
-  /// "user" = the human's message, "assistant" = the AI's reply.
   role        String
   content     String
   createdAt   DateTime @default(now())
@@ -151,22 +126,14 @@ model ChatMessage {
   @@index([patientId])
 }
 
-/// Notification feed entries — badge earned, plan prescribed, streak
-/// milestone, AI coach summary, etc. Shown in the header bell dropdown.
+/// Notification feed entries.
 model Notification {
   id        String   @id @default(cuid())
-  /// The user who should see this notification.
   userId    String
-  /// "badge_earned" | "plan_prescribed" | "streak_milestone" |
-  /// "session_saved" | "coach_summary" | "goal_achieved" | "info"
   type      String   @default("info")
-  /// Short headline, e.g. "Badge earned: Perfect Form".
   title     String
-  /// Longer body, e.g. "You completed a session with zero compensation errors."
   body      String?
-  /// Severity for color-coding: "success" | "info" | "warning" | "celebration".
   severity  String   @default("info")
-  /// Optional link target (e.g. a session id or patient id).
   linkType  String?
   linkId    String?
   read      Boolean  @default(false)
@@ -176,21 +143,14 @@ model Notification {
   @@index([userId])
 }
 
-/// Doctor-set rehabilitation goals for a patient — specific ROM or rep-count
-/// milestones to achieve by a target date. The patient sees a goal tracker
-/// with progress; achieving a goal fires a celebration + notification.
+/// Doctor-set rehabilitation goals for a patient.
 model RehabGoal {
   id          String   @id @default(cuid())
   patientId   String
-  /// "rom_target" (reach X degrees) | "rep_count" (complete X total reps) |
-  /// "accuracy" (reach X% accuracy over N sessions) | "streak" (N-day streak)
   type        String   @default("rom_target")
   title       String
-  /// The target value (degrees for rom_target, reps for rep_count, etc.).
   targetValue Float
-  /// The current best-observed value (updated when sessions are saved).
   currentValue Float  @default(0)
-  /// Whether the goal has been achieved.
   achieved    Boolean  @default(false)
   achievedAt  DateTime?
   startDate   DateTime @default(now())
@@ -201,15 +161,12 @@ model RehabGoal {
   @@index([patientId])
 }
 
-/// Rehabilitation streak tracker — one row per patient. Counts consecutive
-/// days with at least one session. Includes a "freeze" counter (grace days
-/// that preserve a streak when the patient misses a day).
+/// Rehabilitation streak tracker.
 model Streak {
   id            String   @id @default(cuid())
   userId        String   @unique
   currentStreak Int      @default(0)
   longestStreak Int      @default(0)
-  /// Number of streak-freeze grace days available (max 2).
   freezesLeft   Int      @default(2)
   lastSessionDate String?
   updatedAt     DateTime @updatedAt
