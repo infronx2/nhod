@@ -3,12 +3,12 @@
 import * as React from 'react'
 import { motion } from 'framer-motion'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
-import { Save, RefreshCw, Activity } from 'lucide-react'
+import { RefreshCw, Activity, FileJson, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -18,15 +18,22 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/use-auth'
+import { apiFetch } from '@/lib/api'
+import { FhirViewer } from '@/components/neuromove/fhir-viewer'
 import type {
   SessionRecord,
   SessionsResponse,
   StatsResponse,
-  SaveSessionPayload,
 } from '@/components/neuromove/types'
+import type {
+  V2Session,
+  V2SessionsResponse,
+  V2Stats,
+} from '@/lib/v2-types'
 
-const SESSIONS_URL = '/api/v1/sessions?XTransformPort=8001'
-const STATS_URL = '/api/v1/stats?XTransformPort=8001'
+const V1_SESSIONS_URL = '/api/v1/sessions?XTransformPort=8001'
+const V1_STATS_URL = '/api/v1/stats?XTransformPort=8001'
 
 interface SessionHistoryProps {
   currentSnapshot: {
@@ -37,12 +44,18 @@ interface SessionHistoryProps {
     score: number
     durationSeconds: number
   }
+  /**
+   * A monotonically-increasing counter. The component re-fetches its data
+   * whenever this value changes — used so the parent (page) can trigger a
+   * refresh after a session is saved via the tracking panel.
+   */
+  refreshSignal?: number
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | Date): string {
   try {
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return iso
+    const d = typeof iso === 'string' ? new Date(iso) : iso
+    if (Number.isNaN(d.getTime())) return String(iso)
     return d.toLocaleString('en-GB', {
       year: 'numeric',
       month: 'short',
@@ -51,109 +64,107 @@ function formatDate(iso: string): string {
       minute: '2-digit',
     })
   } catch {
-    return iso
+    return String(iso)
   }
 }
 
-export function SessionHistory({ currentSnapshot }: SessionHistoryProps) {
-  const [sessions, setSessions] = React.useState<SessionRecord[]>([])
-  const [stats, setStats] = React.useState<StatsResponse | null>(null)
-  const [loadingSessions, setLoadingSessions] = React.useState(true)
-  const [loadingStats, setLoadingStats] = React.useState(true)
-  const [patientId, setPatientId] = React.useState('demo_patient')
-  const [saving, setSaving] = React.useState(false)
+/**
+ * SessionHistory — pulls persisted sessions and aggregate stats from either
+ * the v1 Python backend (unauthenticated demo) or the v2 Next.js API
+ * (authenticated patient/doctor).
+ *
+ * Authenticated mode also adds a per-row "View FHIR" button that opens the
+ * FhirViewer dialog with the FHIR R4 Observation payload.
+ */
+export function SessionHistory({ currentSnapshot, refreshSignal = 0 }: SessionHistoryProps) {
+  const { user } = useAuth()
 
-  const fetchSessions = React.useCallback(async () => {
-    setLoadingSessions(true)
+  // Authenticated state (v2)
+  const [v2Sessions, setV2Sessions] = React.useState<V2Session[]>([])
+  const [v2Stats, setV2Stats] = React.useState<V2Stats | null>(null)
+  const [loadingV2, setLoadingV2] = React.useState(false)
+
+  // Unauthenticated state (v1 — kept for the demo fallback)
+  const [v1Sessions, setV1Sessions] = React.useState<SessionRecord[]>([])
+  const [v1Stats, setV1Stats] = React.useState<StatsResponse | null>(null)
+  const [loadingV1, setLoadingV1] = React.useState(true)
+
+  const [fhirSessionId, setFhirSessionId] = React.useState<string | null>(null)
+  const [fhirOpen, setFhirOpen] = React.useState(false)
+
+  const fetchV2 = React.useCallback(async () => {
+    if (!user) return
+    setLoadingV2(true)
     try {
-      const res = await fetch(SESSIONS_URL)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = (await res.json()) as SessionsResponse
-      setSessions(json.sessions ?? [])
+      const patientId = user.role.toUpperCase() === 'DOCTOR' ? '' : user.id
+      const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}&limit=50` : '?limit=50'
+      const data = await apiFetch<V2SessionsResponse>(`/api/v2/sessions${qs}`)
+      setV2Sessions(data.sessions ?? [])
+      const stats = await apiFetch<V2Stats>(
+        `/api/v2/stats${patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''}`,
+      )
+      setV2Stats(stats)
     } catch (err) {
-      console.warn('sessions fetch failed', err)
+      const msg = err instanceof Error ? err.message : 'failed'
+      toast.error('Could not load sessions', { description: msg })
     } finally {
-      setLoadingSessions(false)
+      setLoadingV2(false)
+    }
+  }, [user])
+
+  const fetchV1 = React.useCallback(async () => {
+    setLoadingV1(true)
+    try {
+      const [s, st] = await Promise.all([
+        fetch(V1_SESSIONS_URL).then((r) => r.json() as Promise<SessionsResponse>),
+        fetch(V1_STATS_URL).then((r) => r.json() as Promise<StatsResponse>),
+      ])
+      setV1Sessions(s.sessions ?? [])
+      setV1Stats(st)
+    } catch {
+      /* silent */
+    } finally {
+      setLoadingV1(false)
     }
   }, [])
 
-  const fetchStats = React.useCallback(async () => {
-    setLoadingStats(true)
-    try {
-      const res = await fetch(STATS_URL)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = (await res.json()) as StatsResponse
-      setStats(json)
-    } catch (err) {
-      console.warn('stats fetch failed', err)
-    } finally {
-      setLoadingStats(false)
-    }
-  }, [])
-
-  // Initial fetch + 10s polling.
   React.useEffect(() => {
-    void fetchSessions()
-    void fetchStats()
-    const id = window.setInterval(() => {
-      void fetchSessions()
-      void fetchStats()
-    }, 10_000)
-    return () => window.clearInterval(id)
-  }, [fetchSessions, fetchStats])
+    if (user) {
+      void fetchV2()
+    } else {
+      void fetchV1()
+      const id = window.setInterval(() => void fetchV1(), 10_000)
+      return () => window.clearInterval(id)
+    }
+  }, [user, fetchV2, fetchV1, refreshSignal])
 
-  const handleSave = async () => {
-    if (currentSnapshot.repCount <= 0) {
-      toast.warning('No reps to save', {
-        description: 'Start a tracking session first to record some reps.',
-      })
-      return
-    }
-    setSaving(true)
-    try {
-      const payload: SaveSessionPayload = {
-        patient_id: patientId || 'demo_patient',
-        duration_seconds: Math.max(1, Math.round(currentSnapshot.durationSeconds)),
-        total_reps: currentSnapshot.repCount,
-        correct_reps: currentSnapshot.correctReps,
-        max_achieved_angle: Math.round(currentSnapshot.maxAchievedAngle),
-        compensation_errors: currentSnapshot.compensationErrors,
-        gamification_score: currentSnapshot.score,
-      }
-      const res = await fetch(SESSIONS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = (await res.json()) as { ok: boolean; session?: SessionRecord; error?: string }
-      if (!json.ok) throw new Error(json.error ?? 'server rejected payload')
-      toast.success('Session saved', {
-        description: `${payload.total_reps} reps · ${payload.gamification_score} pts → ${payload.patient_id}`,
-      })
-      await Promise.all([fetchSessions(), fetchStats()])
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'unknown'
-      toast.error('Save failed', { description: msg })
-    } finally {
-      setSaving(false)
-    }
+  const handleViewFhir = (sessionId: string) => {
+    setFhirSessionId(sessionId)
+    setFhirOpen(true)
   }
 
-  const totalReps = stats?.total_reps ?? 0
-  const totalCorrect = stats?.total_correct_reps ?? 0
+  // Aggregate stats for the donut.
+  const totalReps = user ? (v2Stats?.totalReps ?? 0) : (v1Stats?.total_reps ?? 0)
+  const totalCorrect = user
+    ? (v2Stats?.totalCorrectReps ?? 0)
+    : (v1Stats?.total_correct_reps ?? 0)
   const totalComp = Math.max(0, totalReps - totalCorrect)
-  const accuracy = stats?.accuracy_pct ?? 0
+  const accuracy = user ? (v2Stats?.accuracyPct ?? 0) : (v1Stats?.accuracy_pct ?? 0)
+  const totalCount = user ? (v2Stats?.count ?? 0) : (v1Stats?.count ?? 0)
+  const totalScore = user ? (v2Stats?.totalScore ?? 0) : (v1Stats?.total_score ?? 0)
 
   const pieData = [
     { name: 'Correct', value: totalCorrect, color: '#10b981' },
     { name: 'Compensated', value: totalComp, color: '#f43f5e' },
   ].filter((d) => d.value > 0)
 
+  const loading = user ? loadingV2 : loadingV1
+  const sessions = user ? v2Sessions : v1Sessions
+
   return (
     <section
       aria-label="Session history"
-      className="rounded-xl border border-border/60 bg-card/40 p-4 sm:p-6"
+      className="rounded-xl border border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-6"
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -161,7 +172,11 @@ export function SessionHistory({ currentSnapshot }: SessionHistoryProps) {
             Session History
           </h2>
           <p className="text-sm text-muted-foreground">
-            Past sessions fetched from <code className="text-xs">/api/v1/sessions</code> every 10s.
+            {user
+              ? 'Persisted sessions from /api/v2/sessions — authenticated as ' +
+                user.name +
+                '.'
+              : 'Demo sessions from the Python /api/v1/sessions endpoint.'}
           </p>
         </div>
         <Button
@@ -169,8 +184,8 @@ export function SessionHistory({ currentSnapshot }: SessionHistoryProps) {
           variant="outline"
           className="h-9 gap-1.5"
           onClick={() => {
-            void fetchSessions()
-            void fetchStats()
+            if (user) void fetchV2()
+            else void fetchV1()
           }}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -185,7 +200,7 @@ export function SessionHistory({ currentSnapshot }: SessionHistoryProps) {
             <h3 className="text-sm font-semibold text-foreground">Recent Sessions</h3>
           </div>
           <div className="nm-scroll-thin max-h-96 overflow-y-auto">
-            {loadingSessions && sessions.length === 0 ? (
+            {loading && sessions.length === 0 ? (
               <div className="p-3">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <Skeleton key={i} className="mb-2 h-10 w-full" />
@@ -194,53 +209,95 @@ export function SessionHistory({ currentSnapshot }: SessionHistoryProps) {
             ) : sessions.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
                 <Activity className="h-8 w-8 opacity-50" aria-hidden="true" />
-                <p className="text-sm">No sessions yet — start tracking to record one.</p>
+                <p className="text-sm">
+                  {user
+                    ? 'No sessions saved yet — start tracking and press “Save session”.'
+                    : 'No sessions yet — start tracking to record one.'}
+                </p>
               </div>
             ) : (
               <Table>
                 <TableHeader className="sticky top-0 bg-card">
                   <TableRow>
-                    <TableHead className="text-xs">ID</TableHead>
                     <TableHead className="text-xs">Date</TableHead>
-                    <TableHead className="text-xs">Patient</TableHead>
+                    {user && <TableHead className="text-xs">Patient</TableHead>}
                     <TableHead className="text-right text-xs">Reps</TableHead>
                     <TableHead className="text-right text-xs">Max°</TableHead>
                     <TableHead className="text-right text-xs">Comp</TableHead>
                     <TableHead className="text-right text-xs">Score</TableHead>
+                    {user && <TableHead className="text-right text-xs">FHIR</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sessions
-                    .slice()
-                    .reverse()
-                    .map((s) => (
-                      <TableRow key={s.id} className="text-xs">
-                        <TableCell className="font-mono">{s.id}</TableCell>
-                        <TableCell>{formatDate(s.session_date)}</TableCell>
-                        <TableCell className="font-mono">{s.patient_id}</TableCell>
-                        <TableCell className="text-right font-mono">{s.total_reps}</TableCell>
-                        <TableCell className="text-right font-mono">{s.max_achieved_angle}°</TableCell>
-                        <TableCell className="text-right font-mono text-rose-500">
-                          {s.compensation_errors}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-semibold text-emerald-500">
-                          {s.gamification_score}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                  {user
+                    ? v2Sessions.map((s) => (
+                        <TableRow key={s.id} className="text-xs">
+                          <TableCell className="whitespace-nowrap">
+                            {formatDate(s.sessionDate)}
+                          </TableCell>
+                          <TableCell className="font-mono text-[10px]">
+                            {s.patient?.name ?? s.patientId.slice(-6)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {s.totalReps}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {s.maxAchievedAngle.toFixed(0)}°
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-rose-500">
+                            {s.compensationErrors}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-semibold text-emerald-500">
+                            {s.gamificationScore}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-[10px]"
+                              onClick={() => handleViewFhir(s.id)}
+                            >
+                              <FileJson className="h-3 w-3" />
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    : v1Sessions
+                        .slice()
+                        .reverse()
+                        .map((s) => (
+                          <TableRow key={s.id} className="text-xs">
+                            <TableCell className="whitespace-nowrap">
+                              {formatDate(s.session_date)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {s.total_reps}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {s.max_achieved_angle}°
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-rose-500">
+                              {s.compensation_errors}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold text-emerald-500">
+                              {s.gamification_score}
+                            </TableCell>
+                          </TableRow>
+                        ))}
                 </TableBody>
               </Table>
             )}
           </div>
         </Card>
 
-        {/* Aggregate stats */}
+        {/* Aggregate stats + donut */}
         <Card className="lg:col-span-2">
           <div className="border-b border-border/60 p-3">
             <h3 className="text-sm font-semibold text-foreground">Aggregate Stats</h3>
           </div>
           <div className="p-4">
-            {loadingStats && !stats ? (
+            {loading && !v2Stats && !v1Stats ? (
               <div className="grid grid-cols-2 gap-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <Skeleton key={i} className="h-16 w-full" />
@@ -249,10 +306,10 @@ export function SessionHistory({ currentSnapshot }: SessionHistoryProps) {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <StatBox label="Sessions" value={stats?.count ?? 0} accent="text-sky-400" />
+                  <StatBox label="Sessions" value={totalCount} accent="text-sky-400" />
                   <StatBox label="Total reps" value={totalReps} accent="text-teal-400" />
                   <StatBox label="Correct reps" value={totalCorrect} accent="text-emerald-500" />
-                  <StatBox label="Total score" value={stats?.total_score ?? 0} accent="text-amber-500" />
+                  <StatBox label="Total score" value={totalScore} accent="text-amber-500" />
                 </div>
                 <div className="mt-4 flex flex-col items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-3">
                   <div className="flex w-full items-center justify-between">
@@ -323,33 +380,24 @@ export function SessionHistory({ currentSnapshot }: SessionHistoryProps) {
         </Card>
       </div>
 
-      {/* Save current session */}
+      {/* Live snapshot readout (always useful — shows what would be saved). */}
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-3">
-        <label htmlFor="patient-id" className="text-xs font-medium text-muted-foreground">
-          Patient ID
-        </label>
-        <Input
-          id="patient-id"
-          value={patientId}
-          onChange={(e) => setPatientId(e.target.value)}
-          className="h-9 w-44 font-mono text-xs"
-          placeholder="demo_patient"
-          aria-label="Patient ID for session save"
-        />
-        <Button
-          size="sm"
-          className="h-9 gap-1.5"
-          disabled={saving}
-          onClick={handleSave}
-        >
-          <Save className="h-3.5 w-3.5" aria-hidden="true" />
-          {saving ? 'Saving…' : 'Save current session'}
-        </Button>
-        <span className="ml-auto text-xs text-muted-foreground">
-          Live: {currentSnapshot.repCount} reps · {currentSnapshot.score} pts ·{' '}
+        <Badge variant="outline" className="gap-1 px-2 py-0.5 text-[10px]">
+          <Loader2 className={cn('h-3 w-3', false && 'animate-spin')} />
+          Live snapshot
+        </Badge>
+        <span className="text-xs text-muted-foreground">
+          {currentSnapshot.repCount} reps · {currentSnapshot.correctReps} correct ·{' '}
+          {currentSnapshot.score} pts · {currentSnapshot.maxAchievedAngle.toFixed(0)}° max ·{' '}
           {currentSnapshot.durationSeconds.toFixed(0)}s
         </span>
       </div>
+
+      <FhirViewer
+        sessionId={fhirSessionId}
+        open={fhirOpen}
+        onOpenChange={setFhirOpen}
+      />
     </section>
   )
 }

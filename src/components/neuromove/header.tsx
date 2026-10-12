@@ -8,9 +8,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { WsConnectionState } from '@/components/neuromove/types'
+import { UserMenu } from '@/components/neuromove/user-menu'
+import { useAuth } from '@/hooks/use-auth'
 
 interface HeaderProps {
-  connection: WsConnectionState
+  /** WS connection state. Omit / pass undefined to hide the WS pill entirely. */
+  connection?: WsConnectionState
   rtl: boolean
   onToggleRtl: () => void
 }
@@ -61,8 +64,19 @@ function NeuroMoveLogo({ className }: { className?: string }) {
   )
 }
 
+/**
+ * Header — sticky top bar. When the user is authenticated (Phase 2) we show
+ * the gradient header background + the UserMenu (avatar + role + logout)
+ * alongside the existing language/theme toggles. When not authenticated we
+ * render a slimmer version (just the brand + toggles) — the AuthScreen owns
+ * the rest of the viewport in that case.
+ *
+ * The header background uses a subtle dark gradient with a faint radial teal
+ * glow behind the logo for visual depth.
+ */
 export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
   const { theme, setTheme } = useTheme()
+  const { user } = useAuth()
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
 
@@ -81,10 +95,22 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
   return (
     <header
       className={cn(
-        'sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60',
+        'sticky top-0 z-40 w-full border-b border-border/60 backdrop-blur-md supports-[backdrop-filter]:bg-background/70',
+        // Subtle gradient overlay (works in both light and dark mode)
+        'bg-gradient-to-r from-slate-50 via-background to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950',
       )}
     >
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
+      {/* radial teal glow behind the logo */}
+      <div
+        className="pointer-events-none absolute top-1/2 left-2 h-24 w-24 -translate-y-1/2 rounded-full opacity-40 blur-2xl sm:left-6"
+        style={{
+          background:
+            'radial-gradient(circle at center, rgba(20,184,166,0.45), transparent 70%)',
+        }}
+        aria-hidden="true"
+      />
+
+      <div className="relative mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <motion.div
             initial={{ rotate: -8, opacity: 0 }}
@@ -105,18 +131,21 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <Badge
-            variant="outline"
-            className={cn(
-              'hidden gap-1.5 border-border/60 px-2.5 py-1 text-xs font-medium sm:inline-flex',
-              rtl && 'flex-row-reverse',
-            )}
-            aria-label={`Demo text direction: ${rtl ? 'RTL Arabic' : 'LTR English'}`}
-          >
-            <span className={cn('text-foreground', rtl && 'font-arabic')}>
-              {rtl ? 'مرحباً بكم في NeuroMove' : 'Welcome to NeuroMove'}
-            </span>
-          </Badge>
+          {/* Hide the language pill when authenticated — UserMenu is more useful. */}
+          {!user && (
+            <Badge
+              variant="outline"
+              className={cn(
+                'hidden gap-1.5 border-border/60 px-2.5 py-1 text-xs font-medium sm:inline-flex',
+                rtl && 'flex-row-reverse',
+              )}
+              aria-label={`Demo text direction: ${rtl ? 'RTL Arabic' : 'LTR English'}`}
+            >
+              <span className={cn('text-foreground', rtl && 'font-arabic')}>
+                {rtl ? 'مرحباً بكم في NeuroMove' : 'Welcome to NeuroMove'}
+              </span>
+            </Badge>
+          )}
 
           <Button
             variant="outline"
@@ -149,31 +178,37 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
             )}
           </Button>
 
-          <div
-            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/40 px-3 py-1.5 text-xs font-medium"
-            role="status"
-            aria-live="polite"
-          >
-            <span className="relative inline-flex h-2.5 w-2.5">
-              <span
-                className={cn(
-                  'inline-flex h-2.5 w-2.5 rounded-full',
-                  statusColor[connection],
+          {/* WS status pill — only shown when a connection state is provided
+              (the doctor view doesn't have a tracking panel, so it omits it). */}
+          {user && connection && (
+            <div
+              className="hidden items-center gap-2 rounded-full border border-border/60 bg-card/40 px-3 py-1.5 text-xs font-medium md:inline-flex"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="relative inline-flex h-2.5 w-2.5">
+                <span
+                  className={cn(
+                    'inline-flex h-2.5 w-2.5 rounded-full',
+                    statusColor[connection],
+                  )}
+                />
+                {connection === 'Connecting' && (
+                  <span className="absolute inset-0 inline-flex h-2.5 w-2.5 animate-ping rounded-full bg-amber-500/60" />
                 )}
-              />
-              {connection === 'Connecting' && (
-                <span className="absolute inset-0 inline-flex h-2.5 w-2.5 animate-ping rounded-full bg-amber-500/60" />
+              </span>
+              <span className="text-foreground/90">{statusLabel[connection]}</span>
+              {connection === 'Disconnected' ? (
+                <WifiOff className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              ) : connection === 'Connecting' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
+              ) : (
+                <Wifi className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
               )}
-            </span>
-            <span className="text-foreground/90">{statusLabel[connection]}</span>
-            {connection === 'Disconnected' ? (
-              <WifiOff className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-            ) : connection === 'Connecting' ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
-            ) : (
-              <Wifi className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
-            )}
-          </div>
+            </div>
+          )}
+
+          {user && <UserMenu />}
         </div>
       </div>
     </header>

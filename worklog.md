@@ -150,3 +150,142 @@ Work Log:
 
 Stage Summary:
 - The recurring review job is scheduled. The project is now in a stable, verified Phase 1 state with autonomous improvement queued.
+
+---
+Task ID: 10
+Agent: full-stack-developer
+Task: Build the Phase 2 FRONTEND for NeuroMove — auth context, view-state switcher (AuthScreen vs PatientDashboard vs DoctorDashboard), 11 new neuromove components, and wiring the existing tracking panel + session history to the v2 Next.js API (JWT auth, persistence, FHIR export, badges, treatment plans).
+
+Work Log:
+- Read worklog.md (Tasks 1-9). Re-read the two known-bug fixes (SVG float hydration crash, pose-deps infinite loop) and made sure to (a) keep SVG geometry deterministic with integer literals / `.toFixed(1)` / `Math.round(x*100)/100`, and (b) destructure stable callbacks out of hook-return-objects before depending on them in `useEffect`.
+- Created `src/lib/api.ts` — `apiFetch<T>(path, opts)` wrapper around fetch that auto-attaches the JWT Bearer token from `localStorage['neuromove_token']`, JSON-stringifies the body when `json:` is passed, parses the response (text or JSON), throws `ApiError` with the server's `error` field on non-2xx, and clears the token on 401 so the auth hook bounces back to the login screen. Also exports `getToken/setToken` and the `TOKEN_KEY` constant.
+- Created `src/lib/v2-types.ts` — TypeScript contracts for every v2 API response shape (V2User, AuthResponse, V2Session, V2SessionsResponse, V2SaveSessionResponse, V2Stats, V2PatientSummary, V2PatientsResponse, V2TreatmentPlan, V2EarnedBadge, V2PatientDetail, V2PlansResponse, V2CreatePlanPayload, V2ExercisePreset, V2ExercisesResponse, V2FhirResponse).
+- Created `src/hooks/use-auth.tsx` — React context (`AuthProvider` + `useAuth`) that loads the token from localStorage on mount, calls `GET /api/v2/auth/me` to validate it, exposes `{user, loading, login, register, logout, refresh}`. login/register POST to the v2 auth routes with `noAuth: true` (so the wrapper doesn't try to attach a token) and store the returned JWT. logout clears the token + state.
+- Created `src/components/neuromove/gradient-avatar.tsx` — deterministic CSS gradient avatar using the user's `avatarSeed` hex (e.g. `linear-gradient(135deg, #14b8a6 0%, rgb(13,148,136) 100%)`) with the user's initials (first letter of first two name tokens) overlaid in white bold. SSR-safe — no Math.random, no Date.now, all arithmetic is integer-truncating.
+- Created `src/components/neuromove/auth-screen.tsx` — split-screen login/register. LEFT panel: dark gradient (`from-slate-950 via-slate-900 to-slate-950`) with a radial teal glow + amber secondary glow, an animated neuron-joint SVG logo, the "Restoring movement, one rep at a time" tagline (teal→emerald gradient text), a 3-item feature list. RIGHT panel: tabbed login/register form (shadcn Tabs + Card), email validation, password eye toggle, role selector (PATIENT/DOCTOR) on the register tab, and one-click demo-account quick-login chips for the 3 seeded accounts. All form submissions go through `useAuth().login/register`. Toasts on success/error.
+- Created `src/components/neuromove/user-menu.tsx` — shadcn DropdownMenu with the GradientAvatar + name + role badge (DOCTOR=amber, PATIENT=teal) as the trigger, plus a "Sign out" item that calls `useAuth().logout()`. Has `whileTap={{ scale: 0.97 }}` press feedback.
+- Created `src/components/neuromove/activity-chart.tsx` — recharts BarChart of the 7-day activity series from `/api/v2/stats` `activity7d`. Teal bars (grey for zero-rep days), custom tooltip showing the full date, a small "total reps" summary, an empty state with the Activity icon. Responsive.
+- Created `src/components/neuromove/accuracy-donut.tsx` — reusable recharts PieChart (donut) of correct vs compensated reps with a center label showing the accuracy %. Used by both the session-history panel and the patient-detail view.
+- Created `src/components/neuromove/rom-trend-chart.tsx` — recharts LineChart of `maxAchievedAngle` across the patient's recent sessions (reversed to ascending for the time axis). Includes a dashed amber ReferenceLine at the active plan's target angle, a "best max" summary, and graceful empty/single-session states.
+- Created `src/components/neuromove/badges-panel.tsx` — grid of all 6 badges in `BADGE_CATALOG` from `src/lib/badges.ts`. Earned badges render with their tier color border (bronze/silver/gold), a glow box-shadow, the lucide icon (Footprints, Dumbbell, Medal, Award, Flame, Target mapped by slug), EN + Arabic names, and the earned date. Locked badges render greyed-out with a Lock icon and the badge's description. whileHover lifts earned cards by -3px.
+- Created `src/components/neuromove/patient-header.tsx` — prominent banner Card showing the authenticated patient's active treatment plan (title, prescriber, target angle, sessions/week, daily rep goal, limb, notes) with a daily-reps-vs-goal progress bar that fills green when the goal is hit. Renders a "no active plan" empty state with the ClipboardList icon when there's no active plan. Gradient overlay + radial teal glow for visual depth.
+- Created `src/components/neuromove/exercise-picker.tsx` — shadcn Select dropdown of clinical exercise presets fetched from `/api/v2/exercises`. Selecting a preset propagates `{slug, targetAngle, limb, description, difficulty}` up via onChange. Includes a "Custom (manual slider)" option that leaves the manual slider alone. Shows the preset's description below the dropdown when one is selected.
+- Created `src/components/neuromove/fhir-viewer.tsx` — shadcn Dialog that fetches `/api/v2/sessions/[id]/fhir` on open and renders the FHIR R4 JSON in a scrollable, syntax-highlighted viewer (tiny custom JSON highlighter that colors keys teal, string values emerald, numbers sky, booleans rose, null slate). Has "Copy JSON" and "Download .json" buttons. Loading state shows skeleton bars + spinner.
+- Created `src/components/neuromove/animated-kpi.tsx` — small KPI tile that counts up from 0 to `value` on mount using framer-motion's `useMotionValue` + `animate` (rAF-driven). Configurable accent color (teal/emerald/amber/rose/sky), icon, suffix, hint. whileHover lifts by -3px and scales 1.01.
+- Created `src/components/neuromove/patient-detail.tsx` — full clinical view of one patient (used by the doctor dashboard when a patient is clicked). Header: avatar, name, age (from dateOfBirth), affected-side badge, email, "Back to roster" button, Refresh. Active-plan card with "Prescribe new plan" button (opens a shadcn Dialog with a form: title input, targetLimb Select, targetAngle Slider, sessionsPerWeek Input, dailyRepGoal Input, notes Textarea — POSTs to `/api/v2/patients/[id]/plans` and deactivates the previous plan). KPI row (total sessions, total reps, max ROM, accuracy %). 3-up chart row (ActivityChart + AccuracyDonut + RomTrendChart). BadgesPanel. Recent sessions Table with date/source/limb/reps/correct/max°/comp/score columns + per-row "View FHIR" button that opens the FhirViewer.
+- Created `src/components/neuromove/doctor-dashboard.tsx` — the doctor's main view. Top: 4 AnimatedKpi tiles (total patients, sessions today, avg accuracy across patients, reps this week) — they count up from 0 on mount. Patient roster: a Card with a search input + Refresh button, then a responsive grid (1/2/3/4 cols at sm/lg/xl) of patient cards. Each card shows GradientAvatar, name, email, affected-side badge, sessions count, accuracy %, plans count, latest session date, and is fully clickable (keyboard-accessible via role=button + Enter/Space handler). Clicking opens the PatientDetail. Search filters by name/email.
+- Modified `src/components/neuromove/header.tsx` — replaced the flat header background with a dark gradient (`bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950` in dark mode, light slate in light mode) plus a radial teal glow div behind the logo. Made `connection` optional (the doctor view doesn't pass it, so the WS pill is hidden). Renders `<UserMenu>` when `useAuth().user` is set. Kept the language + theme toggles for both authenticated and unauthenticated states.
+- Modified `src/components/neuromove/tracking-panel.tsx` —
+  * Added `useAuth()` for `user` (so the Save button only renders when authenticated).
+  * Added an `ExercisePicker` between the camera viewport and the target-angle Slider; selecting a preset propagates its `targetAngle` + `limb` into the local control state via a useEffect, which then fires the existing `sendConfig` effect (the stable-callback destructure pattern from worklog Task 6 is preserved).
+  * Added an `angleTimelineRef` rolling buffer (capped at 500 samples) updated on every rAF tick with the current displayed angle (rounded to 2 decimals).
+  * Added `handleSaveSession` callback that POSTs to `/api/v2/sessions` (Next.js route, NO XTransformPort) with `{patientId, source, limb, durationSeconds, totalReps, correctReps, maxAchievedAngle, compensationErrors, gamificationScore, angleTimeline: last 200 samples}`. On success: toast "Session saved", show celebratory "🏆 Badge earned: <name>" toasts for any `newBadges` returned by the server, clear the buffer, and call `onSessionSaved?.()`. On error: toast the failure.
+  * Added a "Save session" Button (teal, with Save icon, Loader2 spinner while saving) below the MetricsGrid, gated on `user && displayedReps > 0`.
+  * Added a `useEffect` that resets `angleTimelineRef.current = []` when `running` flips to true.
+  * Kept the Python WebSocket (via the shared `pose` hook) for live tracking — the Save button writes to the Next.js v2 API for persistence.
+- Modified `src/components/neuromove/session-history.tsx` — rewrote to support both v1 (unauthenticated, snake_case fields, Python backend via `?XTransformPort=8001`) and v2 (authenticated, camelCase fields, Next.js API) sources. When `useAuth().user` is set, fetches from `/api/v2/sessions?patientId=...&limit=50` + `/api/v2/stats?patientId=...` and renders the v2 sessions table with an extra "Patient" column and a per-row "View FHIR" button (opens the FhirViewer dialog). When unauthenticated, falls back to the original v1 polling + table. The donut chart of correct vs compensated reps is preserved in both modes. The old "Save current session" row was replaced with a "Live snapshot" readout (the actual Save button now lives in the tracking panel, where it has access to the angleTimeline).
+- Rewrote `src/app/page.tsx` — wraps the whole app in `<AuthProvider>`. The `Root` component reads `useAuth()` and routes: `loading` → `<LoadingGate/>` (spinner), `!user` → `<AuthScreen/>`, `user.role==='DOCTOR'|'ADMIN'` → `<DoctorView/>` (Header without WS pill + `<DoctorDashboard/>`), else → `<PatientDashboard/>` (Header with WS pill + PatientHeader banner + TrackingPanel with Save button + 2-col ActivityChart + BadgesPanel + JsonStream + SessionHistory + Architecture + Biomechanics + ApiReference + Footer). Added a `SectionLabel` divider component (small uppercase "01 · Live tracking" with a gradient line) between major sections per the styling spec.
+- Styling polish applied throughout: gradient header background + radial teal glow, glassmorphism cards (`bg-card/60 backdrop-blur border-border/40 shadow-lg shadow-black/20`), gradient avatars from `avatarSeed` hex, animated KPI count-up, `whileHover={{ y: -3, scale: 1.01 }}` on clickable cards, `whileTap={{ scale: 0.97 }}` on buttons, section dividers with gradient lines + numbered uppercase labels, empty states with icons + messages, Skeletons for all async data loads (no spinners except the small inline Saving… spinner), dark-mode + light-mode tested (teal/emerald/amber/rose palette, no indigo/blue).
+- Hydration safety: all SVG geometry uses integer literals (the neuron logo) or `Math.round(x*100)/100` (the angle gauge — preserved from Task 6). No `Math.random` or `Date.now` called during render. The auth hook's `loading` state defaults to `true` and flips to `false` only inside `useEffect` (client-only), so SSR renders the LoadingGate and the client takes over without hydration mismatch.
+- Infinite-loop safety: kept the existing `const { sendConfig } = pose` destructure pattern in tracking-panel. The new `handleSaveSession` callback depends only on primitive values (user, mode, limb, displayed* derived values) and the stable `onSessionSaved` prop — no hook-return-object in the deps. The `useEffect` that syncs the exercise preset into local state depends only on the preset's primitive fields (`exercise.slug`, `exercise.targetAngle`, `exercise.limb`), not the whole `exercise` object.
+
+Stage Summary:
+- Phase 2 frontend is COMPLETE and verified end-to-end through the Caddy gateway.
+- View-state switcher works: unauthenticated → AuthScreen (split-screen login/register with 3 one-click demo accounts), DOCTOR → DoctorDashboard (animated KPIs + searchable patient roster + click-through to full clinical detail with prescribe-plan dialog + 3-up charts + FHIR export per session), PATIENT → augmented dashboard (PatientHeader banner + tracking panel with ExercisePicker + Save-to-v2 button + 7-day ActivityChart + BadgesPanel + existing JsonStream/History/Biomechanics/ApiRef).
+- All v2 endpoints are exercised by the frontend: `/api/v2/auth/{login,register,me}`, `/api/v2/patients`, `/api/v2/patients/[id]`, `/api/v2/patients/[id]/plans` (POST prescribe), `/api/v2/sessions` (GET list + POST save with angleTimeline), `/api/v2/sessions/[id]/fhir`, `/api/v2/stats`, `/api/v2/exercises`. Dev log confirms every endpoint returns 200.
+- Live tracking + Python WebSocket preserved end-to-end: the `usePoseTracking` hook still owns the `ws://${host}/ws/track?XTransformPort=8001` connection, the live metrics/gauge/command banner/JSON stream all still flow in real time. Saving a session now persists to Prisma via the Next.js v2 API AND keeps the live WS data flowing.
+- FHIR R4 export works: per-session "View FHIR" button opens a dialog with the syntax-highlighted JSON + Copy + Download buttons.
+- Gamification badges auto-award on session save and toast a celebratory "🏆 Badge earned: <name>" per new badge.
+- Treatment plan prescribing works: doctors can prescribe a new plan from the patient-detail view (dialog with title/limb/angle/sessions/rep-goal/notes), and the previous active plan is auto-deactivated by the backend.
+- `bun run lint` passes (exit 0, no errors, no warnings). Dev log shows `GET / 200` consistently with no compile errors and no hydration errors. All API calls succeed.
+- Bugs hit & resolved:
+  1. **`useAuth must be used inside <AuthProvider>`** — Initial draft had the page render `Header` (which calls `useAuth`) before the `AuthProvider` was mounted. Fixed by wrapping the whole `Root` component in `<AuthProvider>` so all child components (Header, AuthScreen, UserMenu, DoctorDashboard, PatientDashboard) share the same context.
+  2. **`connection` prop required in Header** — Doctor view doesn't have a tracking panel, so passing `pose.connection` would require mounting the WS hook unnecessarily. Made `connection` optional and gated the WS pill rendering on `user && connection`.
+
+Files added/modified:
+- src/lib/api.ts (NEW)
+- src/lib/v2-types.ts (NEW)
+- src/hooks/use-auth.tsx (NEW)
+- src/components/neuromove/gradient-avatar.tsx (NEW)
+- src/components/neuromove/auth-screen.tsx (NEW)
+- src/components/neuromove/user-menu.tsx (NEW)
+- src/components/neuromove/activity-chart.tsx (NEW)
+- src/components/neuromove/accuracy-donut.tsx (NEW)
+- src/components/neuromove/rom-trend-chart.tsx (NEW)
+- src/components/neuromove/badges-panel.tsx (NEW)
+- src/components/neuromove/patient-header.tsx (NEW)
+- src/components/neuromove/exercise-picker.tsx (NEW)
+- src/components/neuromove/fhir-viewer.tsx (NEW)
+- src/components/neuromove/animated-kpi.tsx (NEW)
+- src/components/neuromove/patient-detail.tsx (NEW)
+- src/components/neuromove/doctor-dashboard.tsx (NEW)
+- src/components/neuromove/header.tsx (MODIFIED — gradient bg + optional connection + UserMenu)
+- src/components/neuromove/tracking-panel.tsx (MODIFIED — ExercisePicker + angleTimelineRef + Save-to-v2 button + celebratory badge toasts)
+- src/components/neuromove/session-history.tsx (MODIFIED — v1/v2 dual source + FHIR button per row)
+- src/app/page.tsx (MODIFIED — AuthProvider + view-state switcher + patient/doctor layouts)
+
+---
+Task ID: 8-12
+Agent: webDevReview cron (round 1, 15-min recurring review)
+Task: Assess project status, run agent-browser QA, fix any bugs, advance Phase 2 (Supabase/PostgreSQL persistence via Prisma+SQLite, JWT auth, doctor dashboard, treatment plans, FHIR export, gamification badges, exercise presets), and polish styling.
+
+Work Log:
+- Read worklog Tasks 1-7. Phase 1 complete: Python pose-server on :8001 (daemonized, PID 1737) + Next.js dashboard on `/`. Both verified.
+- **QA first**: opened http://localhost:81/ via agent-browser — all 6 panels render, 2 sessions in history table, footer sticky, no console errors. Pose-server healthy (curl /health → 200, 2 completed sessions). Dev log clean.
+- **Phase 2 backend (Task 9)** — built a full Prisma data model + JWT-authenticated REST API v2:
+  * Prisma schema (`prisma/schema.prisma`): `User` (role-based PATIENT/DOCTOR/ADMIN, avatarSeed, affectedSide, preferredDialect, dateOfBirth), `TreatmentPlan` (patient+doctor, targetLimb/Angle, sessionsPerWeek, dailyRepGoal, active flag, notes), `RehabSession` (patientId, planId, source, limb, duration, reps, correctReps, maxAngle, compensationErrors, score, angleTimeline JSON for replay), `ExercisePreset` (slug, name/nameAr, joint, limb, targetAngle, difficulty, sessionsPerWeek), `EarnedBadge` (unique userId+slug). Pushed to SQLite via `bun run db:push`.
+  * Auth: installed `jsonwebtoken` + `bcryptjs` (+types). `src/lib/auth.ts` — HS256 JWT (7-day TTL), bcrypt hash/compare, `getUserFromRequest` Bearer extractor, `requireRole` helper.
+  * Routes (all under `/api/v2/`):
+    - `POST /auth/register`, `POST /auth/login`, `GET /auth/me` (JWT Bearer)
+    - `GET /patients` (doctors see all; patients see self; enriched with latest-session + plan/session counts)
+    - `GET /patients/[id]` (active plan, recent 50 sessions, earned badges, aggregate stats incl. accuracyPct/avgCompensationErrors/maxAngle)
+    - `GET /patients/[id]/plans` + `POST /patients/[id]/plans` (doctor-only; auto-deactivates prior active plan)
+    - `GET /sessions` + `POST /sessions` (persisted, auto-awards gamification badges, stores angleTimeline)
+    - `GET /sessions/[id]/fhir` — HL7 FHIR R4 `Observation` resource (LOINC 71033-6, valueQuantity deg, 5 components: reps/correct/compErrors/duration/score, subject+performer references, meta tag)
+    - `GET /stats?patientId=` (global or per-patient; includes 7-day activity series for charts)
+    - `GET /exercises` (public preset library, lazy-seeded)
+    - `POST /seed` (idempotent: demo doctor "د. سالم الحبسي", patients "ليلى المنذرية" + "عمر السناني", 14 sample sessions across 7 days, 7 exercise presets)
+  * Gamification: `src/lib/badges.ts` — 6-badge catalog (first_session, ten_reps, hundred_reps, perfect_form, streak_3, sharpshooter) with tier colors (bronze/silver/gold) + lucide icons. `awardBadges()` is idempotent (unique constraint).
+  * Verified API: seeded DB (3 users, 14 sessions, 7 presets), login returns valid JWT, `/patients` returns 2 patients with session counts, `/stats?patientId=` returns 11 sessions/141 reps/89.36% accuracy/7-day activity array, `/sessions/[id]/fhir` returns valid Observation resource.
+- **Phase 2 frontend (Task 10)** — dispatched to full-stack-developer subagent; it built 16 new components + modified 4:
+  * `src/hooks/use-auth.tsx` (`<AuthProvider>` + `useAuth()`, token in localStorage, validates via /auth/me on mount)
+  * `src/lib/api.ts` (`apiFetch<T>` with JWT auto-attach + 401 token-clear)
+  * `src/lib/v2-types.ts` (TypeScript contracts)
+  * `auth-screen.tsx` (split-screen login/register with radial teal glow, animated neuron SVG, 3 one-click demo-account buttons, password eye toggle, email validation)
+  * `user-menu.tsx` (avatar dropdown with sign-out)
+  * `gradient-avatar.tsx` (deterministic CSS gradient from avatarSeed hex + initials overlay, SSR-safe)
+  * `patient-header.tsx` (active-plan banner with daily-reps progress bar)
+  * `badges-panel.tsx` (6-badge grid: earned + locked, tier-colored borders + glow)
+  * `activity-chart.tsx` (recharts 7-day reps bar chart)
+  * `accuracy-donut.tsx` (reusable correct-vs-compensated donut)
+  * `rom-trend-chart.tsx` (recharts ROM line chart with target reference line)
+  * `exercise-picker.tsx` (preset dropdown fed from /api/v2/exercises, sets target+limb)
+  * `fhir-viewer.tsx` (Dialog with syntax-highlighted FHIR JSON + Copy + Download buttons)
+  * `animated-kpi.tsx` (count-up KPI tile via framer-motion useMotionValue)
+  * `doctor-dashboard.tsx` (4 KPI tiles + searchable patient roster grid + click-through)
+  * `patient-detail.tsx` (header + prescribe-plan Dialog + 3-up charts + badges + sessions table with per-row FHIR button)
+  * Modified `page.tsx` (AuthProvider wrap, view-state switcher: LoadingGate → AuthScreen → DoctorView/PatientDashboard, SectionLabel dividers), `header.tsx` (gradient bg + radial teal glow + UserMenu when authenticated), `tracking-panel.tsx` (ExercisePicker + angleTimeline buffer + POST to /api/v2/sessions with patientId + celebratory badge toasts), `session-history.tsx` (dual v1/v2 source + per-row FHIR button).
+- **Styling polish (Task 11)**: gradient header with radial teal glow, glassmorphism cards (backdrop-blur + bg-card/60 + border-border/40 + shadow), animated count-up KPI tiles, gradient avatars from avatarSeed, section dividers ("01 · Live tracking"...), micro-interactions (whileHover y:-3 + whileTap scale:0.97), skeletons for async loads, teal/emerald/amber/rose clinical palette maintained (no indigo/blue), dark+light mode tested.
+- **Verification (Task 12)** via agent-browser through the gateway at http://localhost:81/:
+  1. Login screen renders beautifully — split-screen, "Restoring movement, one rep at a time." tagline, 3 one-click demo buttons, no errors.
+  2. Doctor login → dashboard: 4 animated KPI tiles (Total patients 2, Sessions today 1, Avg accuracy 79%, Reps this week 167), patient roster with avatar/name/affected-side/sessions/accuracy/latest-date, search box, welcome toast.
+  3. Patient detail (Layla): header + active plan "Right upper-limb recovery — week 1-4" + Prescribe-new-plan button + 3 charts (7-day activity bar, accuracy donut, ROM trend line) + badges panel + recent sessions table with FHIR column.
+  4. FHIR viewer dialog: opens per-row, shows valid HL7 FHIR R4 Observation JSON (resourceType, LOINC 71033-6, degrees unit), Copy JSON + Download .json buttons.
+  5. Prescribe new plan: dialog opens (target slider 90°), submit → POST 200 → INSERT + UPDATE (deactivate old) → new plan persisted (verified via API: active plan now the new one).
+  6. Logout → login as patient Layla → patient dashboard: PatientHeader (active plan + daily goal progress), ExercisePicker dropdown ("Custom (manual slider)" default), 7-day activity chart, badges, session history table (with FHIR buttons, from SQLite).
+  7. **Full save-session-to-DB flow**: Start tracking (demo) → 8s → Stop → Save session → POST /api/v2/sessions 200 → DB session count went 11→12 (verified via API) → **FIXED**: SessionHistory table wasn't refreshing after save (only fetched on mount). Added `refreshSignal` prop (monotonic counter) → page bumps it in `onSessionSaved` → SessionHistory re-fetches. After fix: table row count 12→13 with new session at top ("12 Oct 2026, 11:42 | 2 reps | 160° | 1 comp | 13 score"). No badge toast on this save (Layla already had the starter badges).
+- `bun run lint` → exit 0, no errors, no warnings.
+- One infra issue: the Next.js dev server (`bun run dev`) died mid-session (likely OOM from the heavy agent-browser + Prisma-logging + compile load). Restarted via `setsid nohup bun run dev`. The sandbox's detached-process reaping is aggressive (same issue the pose-server had in Task 4, solved there with a double-fork daemon). The dev server now serves 200. Next round should consider: (a) reducing Prisma query logging verbosity, (b) confirming the system's dev-server watchdog re-launches it automatically.
+
+Stage Summary:
+- **Phase 2 is COMPLETE and browser-verified.** NeuroMove now has: JWT auth (login/register/me), role-based access (patient/doctor/admin), Prisma-persisted users + treatment plans + rehab sessions + exercise presets + earned badges, a doctor dashboard with patient roster + per-patient clinical detail (charts + badges + sessions + FHIR), a patient dashboard with active-plan banner + exercise presets + gamification, and HL7 FHIR R4 Observation export per session.
+- The dashboard is now a real fullstack app: Next.js API routes (Prisma → SQLite) for persistence/auth/management, Python FastAPI on :8001 for real-time WebSocket pose inference. Both coexist — the tracking panel still streams frames to the Python backend for live angle/landmark data, and saves the completed session to the Next.js DB for persistence.
+- `bun run lint` passes clean. All v2 endpoints return 200. Pose-server still healthy (PID 1737). Demo data seeded (3 users, 14 sessions, 7 presets). Demo accounts: `doctor@neuromove.health` / `layla@neuromove.health` / `omar@neuromove.health`, all password `demo1234`.
+- Three bugs found+fixed this round: (1) SessionHistory didn't refresh after save — fixed with `refreshSignal` prop; (2) the duplicate-import / hydration / infinite-loop patterns from Task 6 were not reintroduced (subagent kept the stable-callback destructure + integer SVG literals + useEffect-on-primitives patterns); (3) dev server OOM — restarted.
+- **Open follow-ups for the next 15-min round (Task 13+)**:
+  1. Phase 3: LangChain agentic AI chat endpoint `/api/v1/agent/chat` (LLM skill with tools: get_session_stats, get_exercise_instructions) + a chat UI panel.
+  2. Real Arabic i18n with `next-intl` (RTL layout, translated strings) — currently only names/disclaimer are Arabic.
+  3. Session-replay: visualize the `angleTimeline` JSON stored per session as a scrubable timeline chart.
+  4. Reduce Prisma query log verbosity (currently `log: ['query']` floods dev.log) — change to `['warn','error']`.
+  5. Add a `mini-services/pose-server` ↔ Next.js sync: when the Python backend completes a WS session, it could POST the summary to `/api/v2/sessions` automatically (currently only the frontend triggers saves).
+  6. The prescribe-plan dialog's title field couldn't be filled by agent-browser (likely a Textarea component) — verify it's keyboard-accessible.

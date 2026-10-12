@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { motion } from 'framer-motion'
-import { Play, Square, Camera, ScanFace, RotateCcw } from 'lucide-react'
+import { Play, Square, Camera, ScanFace, RotateCcw, Save, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -21,6 +21,10 @@ import { useDemoSimulator, synthElbowAngleAt } from '@/hooks/use-demo-simulator'
 import { AngleGauge } from '@/components/neuromove/angle-gauge'
 import { CommandBanner } from '@/components/neuromove/command-banner'
 import { MetricsGrid } from '@/components/neuromove/metrics-grid'
+import { ExercisePicker, type ExercisePickerValue } from '@/components/neuromove/exercise-picker'
+import { useAuth } from '@/hooks/use-auth'
+import { apiFetch } from '@/lib/api'
+import type { V2SaveSessionResponse } from '@/lib/v2-types'
 import type { WsCommand, PoseLandmarks } from '@/components/neuromove/types'
 
 type Mode = 'live' | 'demo'
@@ -35,6 +39,11 @@ interface TrackingPanelProps {
    * share a single WebSocket. Pass `usePoseTracking(...)` from the page.
    */
   pose: PoseTrackingApi
+  /**
+   * Optional callback invoked after a session is successfully persisted to
+   * /api/v2/sessions. Parents can use this to refresh charts/history.
+   */
+  onSessionSaved?: () => void
 }
 
 export interface TrackSnapshot {
@@ -92,7 +101,8 @@ const DEMO_INITIAL: DemoMetrics = {
  * will return NO_POSE for the synthetic stick figure. This keeps the
  * dashboard demonstrable without a webcam (e.g. agent-browser).
  */
-export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: TrackingPanelProps) {
+export function TrackingPanel({ goal, onGoalChange, onTrackState, pose, onSessionSaved }: TrackingPanelProps) {
+  const { user } = useAuth()
   const [mode, setMode] = React.useState<Mode>('demo')
   const [running, setRunning] = React.useState(false)
   const [limb, setLimb] = React.useState<'right' | 'left'>('right')
@@ -101,6 +111,19 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: Tracki
   const [mirror, setMirror] = React.useState(true)
   const [cameraError, setCameraError] = React.useState<string | null>(null)
   const [demoMetrics, setDemoMetrics] = React.useState<DemoMetrics>(DEMO_INITIAL)
+  const [exercise, setExercise] = React.useState<ExercisePickerValue>({
+    slug: 'custom',
+    targetAngle: 90,
+    limb: 'right',
+    description: null,
+    difficulty: null,
+  })
+  const [savingSession, setSavingSession] = React.useState(false)
+
+  // Rolling buffer of elbow-angle samples for the session's angleTimeline
+  // field (POSTed to /api/v2/sessions on save). Capped at 500 to match the
+  // server-side clamp.
+  const angleTimelineRef = React.useRef<number[]>([])
 
   const videoRef = React.useRef<HTMLVideoElement | null>(null)
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
@@ -108,6 +131,15 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: Tracki
   const lastFrameTsRef = React.useRef(0)
   const streamRef = React.useRef<MediaStream | null>(null)
   const demoStartRef = React.useRef(0)
+
+  // When the exercise preset changes, sync its target angle + limb into
+  // the local control state (this fires sendConfig via the effect below).
+  // 'custom' leaves the slider value alone.
+  React.useEffect(() => {
+    if (exercise.slug === 'custom') return
+    setTargetAngle(exercise.targetAngle)
+    setLimb(exercise.limb)
+  }, [exercise.slug, exercise.targetAngle, exercise.limb])
 
   // Keep the shared hook config in sync with the local control state so
   // sendConfig / start always use the latest values.
@@ -152,6 +184,15 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: Tracki
     }
     lastFrameTsRef.current = now
 
+    // Push the current displayed angle into the rolling timeline buffer
+    // (capped at 500 samples). Only happens during active tracking.
+    const angleNow = mode === 'demo' ? demoMetrics.angle : pose.elbowAngle
+    if (typeof angleNow === 'number' && angleNow > 0) {
+      const buf = angleTimelineRef.current
+      buf.push(Math.round(angleNow * 100) / 100)
+      if (buf.length > 500) buf.splice(0, buf.length - 500)
+    }
+
     if (mode === 'live') {
       const video = videoRef.current
       if (!video || video.readyState < 2) {
@@ -192,7 +233,7 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: Tracki
     }
 
     rafRef.current = requestAnimationFrame(() => loopRef.current())
-  }, [mode, mirror, pose, sim])
+  }, [mode, mirror, pose, sim, demoMetrics.angle])
 
   // ---- Live camera start/stop ----
   const startCamera = React.useCallback(async () => {
@@ -285,6 +326,11 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: Tracki
     }
     return () => stopCamera()
   }, [mode, running, stopCamera])
+
+  // Reset the angle timeline buffer when (re)starting a tracking session.
+  React.useEffect(() => {
+    if (running) angleTimelineRef.current = []
+  }, [running])
 
   // ---- Demo mode client-side metrics (rep counter with hysteresis) ----
   React.useEffect(() => {
@@ -394,6 +440,78 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: Tracki
     displayedMax,
     displayedCompErrors,
     displayedScore,
+  ])
+
+  // ---- Save session to /api/v2/sessions ----
+  const handleSaveSession = React.useCallback(async () => {
+    if (!user) {
+      toast.error('Sign in to save sessions', {
+        description: 'You must be authenticated to persist a session.',
+      })
+      return
+    }
+    if (displayedReps <= 0) {
+      toast.warning('No reps to save', {
+        description: 'Start tracking and complete at least one rep first.',
+      })
+      return
+    }
+    setSavingSession(true)
+    try {
+      const payload = {
+        patientId: user.id,
+        source: mode,
+        limb,
+        durationSeconds: Math.max(
+          1,
+          Math.round(
+            demoStartRef.current
+              ? (performance.now() - demoStartRef.current) / 1000
+              : 0,
+          ),
+        ),
+        totalReps: displayedReps,
+        correctReps: displayedCorrectReps,
+        maxAchievedAngle: Math.round(displayedMax * 100) / 100,
+        compensationErrors: displayedCompErrors,
+        gamificationScore: displayedScore,
+        angleTimeline: angleTimelineRef.current.slice(-200),
+      }
+      const data = await apiFetch<V2SaveSessionResponse>('/api/v2/sessions', {
+        method: 'POST',
+        json: payload,
+      })
+      toast.success('Session saved', {
+        description: `${payload.totalReps} reps · ${payload.gamificationScore} pts`,
+      })
+      // Celebratory toast for newly-earned badges.
+      if (data.newBadges && data.newBadges.length > 0) {
+        for (const b of data.newBadges) {
+          toast.success(`🏆 Badge earned: ${b.name}`, {
+            description: b.nameAr,
+            duration: 5000,
+          })
+        }
+      }
+      // Clear the buffer so the next session starts fresh.
+      angleTimelineRef.current = []
+      onSessionSaved?.()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'unknown'
+      toast.error('Save failed', { description: msg })
+    } finally {
+      setSavingSession(false)
+    }
+  }, [
+    user,
+    mode,
+    limb,
+    displayedReps,
+    displayedCorrectReps,
+    displayedMax,
+    displayedCompErrors,
+    displayedScore,
+    onSessionSaved,
   ])
 
   return (
@@ -563,7 +681,8 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: Tracki
             )}
           </div>
 
-          {/* Sliders */}
+          {/* Exercise preset + sliders */}
+          <ExercisePicker value={exercise} onChange={setExercise} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between text-xs">
@@ -652,6 +771,30 @@ export function TrackingPanel({ goal, onGoalChange, onTrackState, pose }: Tracki
             simulated={mode === 'demo'}
             command={displayedCommand}
           />
+
+          {/* Save session to /api/v2/sessions */}
+          {user && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+              <Button
+                size="sm"
+                className="h-9 gap-1.5 bg-teal-600 text-white hover:bg-teal-700"
+                onClick={handleSaveSession}
+                disabled={savingSession || displayedReps <= 0}
+              >
+                {savingSession ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                {savingSession ? 'Saving…' : 'Save session'}
+              </Button>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {displayedReps > 0
+                  ? `${displayedReps} reps · ${displayedScore} pts · ${displayedMax.toFixed(0)}° max → saved to your profile`
+                  : 'No reps to save yet'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </Card>
