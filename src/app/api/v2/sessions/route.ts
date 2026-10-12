@@ -90,6 +90,14 @@ export async function POST(req: NextRequest) {
   // Gamification: award any newly-earned badges for this patient.
   const newBadges = await awardBadges(body.patientId)
 
+  // Update the streak tracker + emit milestone notifications.
+  const { updateStreakOnSession } = await import('@/lib/streaks')
+  const streakInfo = await updateStreakOnSession(body.patientId, session.sessionDate)
+
+  // Update any unachieved goals whose currentValue this session improves.
+  const { updateGoalsOnSession } = await import('@/lib/goals')
+  const goalResults = await updateGoalsOnSession(body.patientId, session)
+
   // Emit a session-saved notification + badge-earned notifications.
   const { createNotification, notifyBadgesEarned } = await import('@/lib/notifications')
   await createNotification({
@@ -105,7 +113,7 @@ export async function POST(req: NextRequest) {
     await notifyBadgesEarned(body.patientId, newBadges.map((b) => b.slug))
   }
 
-  return NextResponse.json({ ok: true, session, newBadges })
+  return NextResponse.json({ ok: true, session, newBadges, streak: streakInfo, goalAchievements: goalResults.achieved })
 }
 
 function clampInt(v: unknown, lo: number, hi: number, def: number): number {

@@ -158,7 +158,7 @@ model Notification {
   /// The user who should see this notification.
   userId    String
   /// "badge_earned" | "plan_prescribed" | "streak_milestone" |
-  /// "session_saved" | "coach_summary" | "info"
+  /// "session_saved" | "coach_summary" | "goal_achieved" | "info"
   type      String   @default("info")
   /// Short headline, e.g. "Badge earned: Perfect Form".
   title     String
@@ -173,5 +173,46 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, read, createdAt])
+  @@index([userId])
+}
+
+/// Doctor-set rehabilitation goals for a patient — specific ROM or rep-count
+/// milestones to achieve by a target date. The patient sees a goal tracker
+/// with progress; achieving a goal fires a celebration + notification.
+model RehabGoal {
+  id          String   @id @default(cuid())
+  patientId   String
+  /// "rom_target" (reach X degrees) | "rep_count" (complete X total reps) |
+  /// "accuracy" (reach X% accuracy over N sessions) | "streak" (N-day streak)
+  type        String   @default("rom_target")
+  title       String
+  /// The target value (degrees for rom_target, reps for rep_count, etc.).
+  targetValue Float
+  /// The current best-observed value (updated when sessions are saved).
+  currentValue Float  @default(0)
+  /// Whether the goal has been achieved.
+  achieved    Boolean  @default(false)
+  achievedAt  DateTime?
+  startDate   DateTime @default(now())
+  targetDate  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([patientId, achieved])
+  @@index([patientId])
+}
+
+/// Rehabilitation streak tracker — one row per patient. Counts consecutive
+/// days with at least one session. Includes a "freeze" counter (grace days
+/// that preserve a streak when the patient misses a day).
+model Streak {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  currentStreak Int      @default(0)
+  longestStreak Int      @default(0)
+  /// Number of streak-freeze grace days available (max 2).
+  freezesLeft   Int      @default(2)
+  lastSessionDate String?
+  updatedAt     DateTime @updatedAt
+
   @@index([userId])
 }

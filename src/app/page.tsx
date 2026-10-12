@@ -16,6 +16,8 @@ import { Footer } from '@/components/neuromove/footer'
 import { AuthScreen } from '@/components/neuromove/auth-screen'
 import { DoctorDashboard } from '@/components/neuromove/doctor-dashboard'
 import { PatientHeader } from '@/components/neuromove/patient-header'
+import { StreakBadge } from '@/components/neuromove/streak-badge'
+import { GoalsTracker } from '@/components/neuromove/goals-tracker'
 import { BadgesPanel } from '@/components/neuromove/badges-panel'
 import { ActivityChart } from '@/components/neuromove/activity-chart'
 import { AgentChat } from '@/components/neuromove/agent-chat'
@@ -198,6 +200,12 @@ function PatientDashboard() {
         />
 
         <SectionLabel index="02">Progress</SectionLabel>
+        {/* Streak badge row */}
+        <div className="flex items-center justify-between gap-2">
+          <StreakBadge />
+        </div>
+        {/* Goals tracker (only renders if the patient has goals) */}
+        <GoalsTracker />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur">
             <ActivityChart data={stats?.activity7d ?? []} loading={statsLoading} />

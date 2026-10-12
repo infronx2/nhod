@@ -49,6 +49,7 @@ import {
 import { cn } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import { AgentChat } from '@/components/neuromove/agent-chat'
+import { FhirBundleButton } from '@/components/neuromove/fhir-bundle-button'
 import type {
   V2PatientDetail,
   V2Stats,
@@ -250,6 +251,7 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
           <RotateCw className="h-3.5 w-3.5" />
           Refresh
         </Button>
+        <FhirBundleButton patientId={patientId} patientName={detail?.patient.name} days={30} />
         <Button
           size="sm"
           className={cn(

@@ -487,3 +487,53 @@ Stage Summary:
   3. Pose-server logging: configure uvicorn's log handlers so WS open/close/sync messages reach server.log (currently only the `daemon starting` line appears).
   4. Apply `nm-shimmer` to all skeleton loading states (currently only some use it).
   5. Full E2E test of the pose-server auto-sync with a real webcam.
+
+---
+Task ID: 39-44
+Agent: webDevReview cron (round 6, 15-min recurring review)
+Task: Assess project status, run agent-browser QA, fix bugs, advance Phase 3+ (FHIR Bundle export, patient goals/milestones system, rehabilitation streaks with freezes, styling polish). Continue from the stable round-5 baseline.
+
+Work Log:
+- Read worklog Tasks 1-38. Round 5 complete (SSE notifications, doctor analytics, progress timeline). Open follow-ups: Arabic i18n, SSE→Redis, pose-server logging, nm-shimmer to all skeletons, new features.
+- **QA first**: pose-server healthy (PID 14655). Dev server healthy (PID 12255). Dashboard renders clean, no console errors. Round 5 stable.
+- **Feature (Task 40) — FHIR Bundle export**:
+  * New `GET /api/v2/sessions/fhir-bundle?patientId=X&days=30` endpoint — batches a patient's recent sessions into a single HL7 FHIR R4 `Bundle` resource (type: collection). Each entry is a full Observation resource (same shape as the single-session FHIR endpoint). Doctors can query any patient; patients get only their own.
+  * `src/components/neuromove/fhir-bundle-button.tsx` — a button on the patient detail page that fetches the bundle and downloads it as a `.json` file. Toasts the session count on success.
+  * Added `<FhirBundleButton />` to the patient detail header next to Refresh/Coach buttons.
+  * **Verified**: API returned a Bundle with 20 entries (resourceType: "Bundle", type: "collection"). Button renders on the patient detail page.
+- **Feature (Task 41) — Patient goals/milestones system**:
+  * Added `RehabGoal` Prisma model (patientId, type [rom_target|rep_count|accuracy|streak], title, targetValue, currentValue, achieved, achievedAt, startDate, targetDate).
+  * `src/lib/goals.ts` — `updateGoalsOnSession(patientId, session)` updates the currentValue of any unachieved goals the session improves, marks them achieved if the target is met, and fires a celebration notification.
+  * New `GET/POST /api/v2/goals` endpoint — list goals (doctors can query any patient; patients get their own) + doctor creates a new goal (notifies the patient).
+  * `src/components/neuromove/goals-tracker.tsx` — a card showing active + achieved goals with animated progress bars, type-specific icons (Flame/Activity/Gauge/Trophy), and a celebratory checkmark + trophy on achieved goals. Only renders if the patient has goals.
+  * Added `<GoalsTracker />` to the patient dashboard's progress section.
+  * **Verified**: created a goal "Reach 120° elbow flexion" (target 120) → saved a session with 125° max ROM → the goal was auto-achieved (`goalAchievements: [{title: "Reach 120° elbow flexion", currentValue: 125}]`) and a celebration notification fired. The dashboard shows "Rehabilitation goals · 1/1 achieved · Reach 120° elbow flexion · 125° / 120°".
+- **Feature (Task 42) — Rehabilitation streaks**:
+  * Added `Streak` Prisma model (userId unique, currentStreak, longestStreak, freezesLeft, lastSessionDate).
+  * `src/lib/streaks.ts` — `updateStreakOnSession(userId, sessionDate)` computes the consecutive-day streak. Duolingo-style "freeze" (max 2): if the patient misses exactly one day and has a freeze, the streak is preserved. Freezes recharge every 7 days of streak (max 2). Milestone notifications fire at 3, 7, 14, 30, 60, 90 days. `getStreak(userId)` returns the current state.
+  * Wired `updateStreakOnSession` into `POST /api/v2/sessions` (runs after the session is saved).
+  * New `GET /api/v2/streak?userId=X` endpoint — returns the streak (doctors can query any patient).
+  * `src/components/neuromove/streak-badge.tsx` — a compact flame badge showing the current day streak + freeze count, with an animated pulsing flame that brightens with streak length. Snowflake icon shows available freezes.
+  * Added `<StreakBadge />` to the patient dashboard's progress section.
+  * **Verified**: streak started at 0 → saved a session → `current: 1, longest: 1, freezesLeft: 2`. Badge renders on the patient dashboard ("1 day streak" with the flame + freeze indicators).
+- **Styling polish (Task 43)**: the goals tracker uses animated progress bars (framer-motion width transitions), the streak badge has a pulsing flame animation, the FHIR bundle button has hover/tap micro-interactions. All new components use the existing glassmorphism + mesh background utilities.
+- **Verification (Task 44)** via agent-browser through the gateway at http://localhost:81/:
+  1. Patient login (Layla): dashboard shows **StreakBadge** ("day streak" present) + **GoalsTracker** ("Rehabilitation goals · 1/1 achieved · Reach 120° elbow flexion · 125° / 120°"). No errors. Screenshot saved to `/home/z/my-project/r6-patient-streak-goals.png`.
+  2. Doctor login → patient detail (Layla): **Export FHIR Bundle** button present next to Refresh/Coach. No errors. Screenshot saved to `/home/z/my-project/r6-fhir-bundle-button.png`.
+  3. `bun run lint` → exit 0.
+  4. DB counts: 4 users, 3 plans, **26 sessions**, 7 presets, 6 badges, 2 chat messages, **8 notifications** (including the goal-achieved celebration), **1 RehabGoal**, **1 Streak**.
+- **Infra note**: after `db:push` added the RehabGoal + Streak models, the running dev server (PID 12255) had the old Prisma client cached — `db.streak` was undefined and routes 500'd. Fixed by killing the `next dev` child process (PID 12258) by PID (pkill -f "bun run dev" only kills the bun parent, not the next dev child) and restarting via `python3 scripts/dev-daemon.py`. Future rounds: after `db:push`, kill the `next dev` child explicitly before restarting.
+
+Stage Summary:
+- **Round 6 is COMPLETE and browser-verified.** NeuroMove now has:
+  * **FHIR Bundle export** — a one-click batch export of a patient's last 30 days of sessions as an HL7 FHIR R4 `Bundle` (collection type) with full Observation entries, ready to POST to a hospital EHR. New `/api/v2/sessions/fhir-bundle` endpoint + `FhirBundleButton` component.
+  * **Patient goals/milestones system** — doctor-set goals (ROM target, rep count, accuracy, streak) with auto-achievement detection on session save, animated progress bars, celebration notifications, and a trophy on achieved goals. New `RehabGoal` model + `/api/v2/goals` endpoint + `GoalsTracker` component + `src/lib/goals.ts`.
+  * **Rehabilitation streaks** — consecutive-day training streak with Duolingo-style freezes (max 2, recharge every 7 days), milestone notifications at 3/7/14/30/60/90 days, an animated flame badge on the patient dashboard. New `Streak` model + `/api/v2/streak` endpoint + `StreakBadge` component + `src/lib/streaks.ts`.
+- The app is now a 7-tier fullstack platform: (1) Python FastAPI on :8001 for real-time WebSocket pose inference + auto-sync, (2) Next.js API v2 routes (Prisma → SQLite) for persistence/auth/management, (3) z-ai LLM for agentic coaching with persisted conversations, (4) a real-time SSE notification system, (5) a clinical analytics layer (heatmap + comp trend + per-limb breakdown + accuracy histogram + adherence gauge), (6) a patient progress timeline, (7) a gamification layer (badges + streaks + goals + FHIR bundle export).
+- `bun run lint` passes clean. Pose-server healthy (PID 14655). Dev-server daemonized (PID 17774). Both survive across bash calls. Demo accounts: `doctor@neuromove.health` / `layla@neuromove.health` / `omar@neuromove.health`, all password `demo1234`.
+- **Open follow-ups for the next 15-min round (Task 45+)**:
+  1. Real Arabic i18n with `next-intl` (RTL layout, translated UI strings) — still the top remaining follow-up.
+  2. A "Set goal" dialog on the patient detail page so doctors can create goals from the UI (currently goals are API-only).
+  3. Apply `nm-shimmer` to all skeleton loading states.
+  4. Pose-server logging: configure uvicorn's log handlers.
+  5. Confetti animation on goal achievement (the celebration notification fires, but no visual confetti).
