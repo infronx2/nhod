@@ -23,6 +23,13 @@ interface Goal {
   createdAt: string
 }
 
+interface SessionSample {
+  maxAchievedAngle: number
+  totalReps: number
+  correctReps: number
+  sessionDate: string
+}
+
 const TYPE_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   rom_target: Flame,
   rep_count: Activity,
@@ -51,6 +58,7 @@ export function GoalsTracker({ patientId }: GoalsTrackerProps = {}) {
   const { user } = useAuth()
   const isDoctor = user?.role.toUpperCase() === 'DOCTOR' || user?.role.toUpperCase() === 'ADMIN'
   const [goals, setGoals] = React.useState<Goal[]>([])
+  const [sessions, setSessions] = React.useState<SessionSample[]>([])
   const [loading, setLoading] = React.useState(true)
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
 
@@ -58,8 +66,15 @@ export function GoalsTracker({ patientId }: GoalsTrackerProps = {}) {
     if (!user) return
     try {
       const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
-      const data = await apiFetch<{ ok: boolean; goals: Goal[] }>(`/api/v2/goals${qs}`)
-      if (data.ok) setGoals(data.goals)
+      const [goalsData, sessionsData] = await Promise.all([
+        apiFetch<{ ok: boolean; goals: Goal[] }>(`/api/v2/goals${qs}`),
+        apiFetch<{ ok: boolean; sessions: SessionSample[] }>(`/api/v2/sessions${qs ? qs + '&limit=30' : '?limit=30'}`),
+      ])
+      if (goalsData.ok) setGoals(goalsData.goals)
+      if (sessionsData.ok) {
+        // Reverse to oldest-first for the sparkline.
+        setSessions([...(sessionsData.sessions ?? [])].reverse())
+      }
     } catch { /* silent */ }
     finally { setLoading(false) }
   }, [user, patientId])
@@ -175,11 +190,89 @@ export function GoalsTracker({ patientId }: GoalsTrackerProps = {}) {
                     transition={{ duration: 0.6, delay: i * 0.05 + 0.1 }}
                   />
                 </div>
+
+                {/* Per-session sparkline (only for ROM/rep/accuracy goals with ≥3 sessions) */}
+                {g.type !== 'streak' && sessions.length >= 3 && (
+                  <GoalSparkline
+                    goal={g}
+                    sessions={sessions}
+                  />
+                )}
               </motion.div>
             )
           })}
         </AnimatePresence>
       </div>
     </Card>
+  )
+}
+
+/**
+ * GoalSparkline — a tiny inline SVG sparkline showing the per-session
+ * metric values relevant to this goal's type, with a dashed target line.
+ */
+function GoalSparkline({ goal, sessions }: { goal: Goal; sessions: SessionSample[] }) {
+  const values = React.useMemo(() => {
+    return sessions.map((s) => {
+      if (goal.type === 'rom_target') return s.maxAchievedAngle
+      if (goal.type === 'rep_count') return s.totalReps
+      if (goal.type === 'accuracy') return s.totalReps > 0 ? (s.correctReps / s.totalReps) * 100 : 0
+      return 0
+    })
+  }, [goal.type, sessions])
+
+  if (values.length < 2) return null
+
+  const W = 100
+  const H = 20
+  const max = Math.max(goal.targetValue, ...values, 1)
+  const min = 0
+  const range = max - min || 1
+  const stepX = W / Math.max(1, values.length - 1)
+  const points = values.map((v, i) => {
+    const x = i * stepX
+    const y = H - ((v - min) / range) * H
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+
+  // Target line Y position.
+  const targetY = H - ((goal.targetValue - min) / range) * H
+  const achievedColor = goal.achieved ? '#10b981' : '#14b8a6'
+
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5">
+      <svg width={W} height={H} className="shrink-0" viewBox={`0 0 ${W} ${H}`}>
+        {/* Target dashed line */}
+        <line
+          x1="0" y1={targetY} x2={W} y2={targetY}
+          stroke="#f59e0b"
+          strokeWidth="0.8"
+          strokeDasharray="2 2"
+          opacity="0.6"
+        />
+        {/* Sparkline polyline */}
+        <polyline
+          points={points}
+          fill="none"
+          stroke={achievedColor}
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Last-point dot */}
+        {values.length > 0 && (
+          <circle
+            cx={((values.length - 1) * stepX).toFixed(1)}
+            cy={(H - ((values[values.length - 1] - min) / range) * H).toFixed(1)}
+            r="1.5"
+            fill={achievedColor}
+          />
+        )}
+      </svg>
+      <span className="text-[9px] text-muted-foreground">
+        {values.length} sessions · last: {values[values.length - 1].toFixed(0)}
+        {goal.type === 'rom_target' ? '°' : goal.type === 'accuracy' ? '%' : ''}
+      </span>
+    </div>
   )
 }

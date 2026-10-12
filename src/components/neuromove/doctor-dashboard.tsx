@@ -27,6 +27,7 @@ import { DoctorAnalytics } from '@/components/neuromove/doctor-analytics'
 import { PatientCompare } from '@/components/neuromove/patient-compare'
 import { ClinicLeaderboard } from '@/components/neuromove/clinic-leaderboard'
 import { ExerciseLibrary } from '@/components/neuromove/exercise-library'
+import { PrescribeFromPresetDialog } from '@/components/neuromove/prescribe-from-preset-dialog'
 import { PatientDetail } from '@/components/neuromove/patient-detail'
 
 interface DoctorDashboardProps {
@@ -69,6 +70,8 @@ export function DoctorDashboard({ doctorId }: DoctorDashboardProps) {
   const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState('')
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
+  const [presetToPrescribe, setPresetToPrescribe] = React.useState<any | null>(null)
+  const [presetDialogOpen, setPresetDialogOpen] = React.useState(false)
 
   const fetchRoster = React.useCallback(async () => {
     setLoading(true)
@@ -188,7 +191,10 @@ export function DoctorDashboard({ doctorId }: DoctorDashboardProps) {
           <ClinicLeaderboard patients={patients} onPatientClick={(id) => setSelectedId(id)} />
         </div>
         <div className="lg:col-span-2">
-          <ExerciseLibrary />
+          <ExerciseLibrary onPrescribe={(preset) => {
+            setPresetToPrescribe(preset)
+            setPresetDialogOpen(true)
+          }} />
         </div>
       </div>
 
@@ -258,6 +264,18 @@ export function DoctorDashboard({ doctorId }: DoctorDashboardProps) {
       <span className="sr-only" aria-hidden="true">
         Doctor ID: {doctorId}
       </span>
+
+      {/* Prescribe-from-preset dialog (opened by ExerciseLibrary "Prescribe") */}
+      <PrescribeFromPresetDialog
+        preset={presetToPrescribe}
+        patients={patients}
+        open={presetDialogOpen}
+        onOpenChange={setPresetDialogOpen}
+        onPrescribed={() => {
+          void fetchRoster()
+          void fetchGlobal()
+        }}
+      />
     </div>
   )
 }

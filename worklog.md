@@ -657,3 +657,38 @@ Stage Summary:
   4. Goal-progress sparkline in the goals tracker.
   5. Full E2E confetti test (set a new unachieved goal, save a session that exceeds it).
   6. Wire the ExerciseLibrary "Prescribe" shortcut to open the PrescribePlanDialog pre-filled with the preset's target angle + limb.
+
+---
+Task ID: 61-66
+Agent: webDevReview cron (round 10, 15-min recurring review)
+Task: Assess project status, run agent-browser QA, fix bugs, advance Phase 3+ (wire ExerciseLibrary "Prescribe" shortcut, goal-progress sparkline, styling polish). Continue from the stable round-9 baseline.
+
+Work Log:
+- Read worklog Tasks 1-60. Round 9 complete (clinic leaderboard, exercise library). Open follow-ups: Arabic i18n, nm-shimmer, pose-server logging, goal sparkline, E2E confetti test, wire ExerciseLibrary "Prescribe" shortcut.
+- **QA first**: pose-server healthy (PID 14655). Dev server healthy (PID 17774). Dashboard renders clean, no console errors. Round 9 stable.
+- **Feature (Task 62) — Wire ExerciseLibrary "Prescribe" shortcut to PrescribePlanDialog**:
+  * `src/components/neuromove/prescribe-from-preset-dialog.tsx` — a new dialog that opens when a doctor clicks "Prescribe" on an exercise preset from the ExerciseLibrary. Lets the doctor: (1) pick a patient from the roster (with avatar + sessions + accuracy summary), (2) review the pre-filled target angle (from the preset) via a slider, (3) set sessions/week + daily rep goal, (4) POST to `/api/v2/patients/[id]/plans`. The preset's name, Arabic name, target angle, and limb are pre-filled, saving the doctor from re-entering clinical parameters.
+  * Wired into the doctor dashboard: added `presetToPrescribe` + `presetDialogOpen` state, passed `onPrescribe` callback to `<ExerciseLibrary>`, and rendered `<PrescribeFromPresetDialog>` at the dashboard root.
+  * **Verified**: doctor clicks "Prescribe" on the "Advanced Elbow Flexion" preset → dialog opens with "Prescribe exercise plan · Create a treatment plan from the 'Advanced Elbow Flexion' preset. The target angle and limb are pre-filled from the preset." + preset name + Arabic name (ثني الكوع المتقدم) + patient picker + target-angle slider + "Prescribe plan" button. No errors. Screenshot saved to `/home/z/my-project/r10-prescribe-from-preset.png`.
+- **Feature (Task 63) — Goal-progress sparkline in the GoalsTracker**:
+  * Updated `src/components/neuromove/goals-tracker.tsx` — now fetches the patient's recent 30 sessions (in parallel with the goals fetch) and renders a `GoalSparkline` per non-streak goal when ≥3 sessions exist.
+  * `GoalSparkline` — a tiny inline SVG (100×20px) showing the per-session metric values relevant to the goal's type (maxAngle for rom_target, totalReps for rep_count, accuracy for accuracy). Renders: an amber dashed target line, a teal/emerald polyline of the per-session values, a dot at the last value, and a "23 sessions · last: 125°" label. Color is emerald for achieved goals, teal for in-progress.
+  * **Verified**: doctor viewing Layla's detail sees "Rehabilitation goals · 1/1 achieved · Reach 120° elbow flexion · 125° / 120° · 23 sessions · last: 125°" with 2 SVG sparklines rendered. No errors. Screenshot saved to `/home/z/my-project/r10-goal-sparkline.png`.
+- **Styling polish (Task 65)**: the PrescribeFromPresetDialog uses a gradient teal→emerald "Prescribe plan" button, a preset summary card with a teal-tinted background, and the patient picker shows a gradient avatar + sessions/accuracy summary. The GoalSparkline uses an amber dashed target line + teal/emerald polyline — color-coded by achievement status.
+- **Verification (Task 66)** via agent-browser through the gateway at http://localhost:81/:
+  1. Doctor login → dashboard: ExerciseLibrary "Prescribe" button → click → PrescribeFromPresetDialog opens with pre-filled preset values. No errors.
+  2. Doctor → patient detail (Layla): GoalsTracker renders with sparklines (2 SVG polylines, "23 sessions · last: 125°"). No errors.
+  3. `bun run lint` → exit 0.
+
+Stage Summary:
+- **Round 10 is COMPLETE and browser-verified.** NeuroMove now has:
+  * **Prescribe-from-preset shortcut** — clicking "Prescribe" on any exercise preset in the ExerciseLibrary opens a dialog that lets the doctor pick a patient + review pre-filled target angle/limb/sessions-per-week (from the preset) + set daily rep goal, then POSTs the plan. The round-9 "Prescribe" button (which was a no-op placeholder) is now fully wired. New `PrescribeFromPresetDialog` component.
+  * **Goal-progress sparkline** — each non-streak goal in the GoalsTracker now shows a tiny inline SVG sparkline of the per-session metric values (maxAngle/reps/accuracy) with an amber dashed target line + a "N sessions · last: X" label. Color-coded by achievement status (emerald=achieved, teal=in-progress). New `GoalSparkline` sub-component.
+- The app is now an 11-tier fullstack platform: (1) Python FastAPI on :8001 for real-time WebSocket pose inference + auto-sync, (2) Next.js API v2 routes (Prisma → SQLite) for persistence/auth/management, (3) z-ai LLM for agentic coaching with persisted conversations, (4) a real-time SSE notification system, (5) a clinical analytics layer (heatmap + comp trend + per-limb breakdown + accuracy histogram + adherence gauge), (6) a patient progress timeline, (7) a gamification layer (badges + streaks + goals + FHIR bundle export), (8) a patient engagement layer (weekly insights + confetti + set-goal dialog), (9) a clinical decision-support layer (patient comparison + goal management), (10) a clinical resource layer (exercise library + clinic leaderboard), (11) a prescription workflow layer (prescribe-from-preset + goal sparklines).
+- `bun run lint` passes clean. Pose-server healthy (PID 14655). Dev-server daemonized (PID 17774). Both survive across bash calls. Demo accounts: `doctor@neuromove.health` / `layla@neuromove.health` / `omar@neuromove.health`, all password `demo1234`.
+- **Open follow-ups for the next 15-min round (Task 67+)**:
+  1. Real Arabic i18n with `next-intl` (RTL layout, translated UI strings) — still the top remaining follow-up.
+  2. Apply `nm-shimmer` to all skeleton loading states.
+  3. Pose-server logging: configure uvicorn's log handlers.
+  4. Full E2E confetti test (set a new unachieved goal, save a session that exceeds it).
+  5. A rehab progress report (printable clinical summary) on the patient detail page.
