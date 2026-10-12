@@ -22,7 +22,9 @@
     "signOut": "تسجيل الخروج",
     "today": "اليوم",
     "thisWeek": "هذا الأسبوع",
-    "last7Days": "آخر ٧ أيام"
+    "last7Days": "آخر ٧ أيام",
+    "doctor": "طبيب",
+    "patient": "مريض"
   },
   "auth": {
     "heroHeadline": "نعيد الحركة،",
@@ -115,7 +117,9 @@
     "elbowAngle": "زاوية الكوع",
     "demoMode": "محاكاة من جهة العميل · دورة ٢٠°-١٦٠°",
     "liveMode": "مباشر من MediaPipe Pose",
-    "simulated": "محاكاة"
+    "simulated": "محاكاة",
+    "latency": "الزمن",
+    "dailyGoalProgress": "تقدّم الهدف اليومي"
   },
   "commands": {
     "KEEP_GOING": "واصل التقدّم",
@@ -300,7 +304,8 @@
     "thisWeek": "هذا الأسبوع",
     "excellentAdherence": "التزام ممتاز — المرضى يحققون أهدافهم الأسبوعية.",
     "moderateAdherence": "التزام متوسط — فكّر في متابعة المرضى تحت ٥٠٪.",
-    "lowAdherence": "التزام منخفض — يحتاج المرضى للتشجيع."
+    "lowAdherence": "التزام منخفض — يحتاج المرضى للتشجيع.",
+    "score": "النقاط"
   },
   "timeline": {
     "title": "مسار التقدّم",

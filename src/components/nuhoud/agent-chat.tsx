@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquare, Send, Sparkles, X, Trash2, Loader2, User, Bot } from 'lucide-react'
+import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -41,6 +42,13 @@ const SUGGESTED_PROMPTS = [
   { en: 'Am I close to my daily goal?', ar: 'هل قريب من هدفي اليومي؟' },
 ]
 
+function getSuggestedPrompts(locale: string) {
+  return SUGGESTED_PROMPTS.map((p, i) => ({
+    key: `suggested${i + 1}`,
+    text: locale === 'ar' ? p.ar : p.en,
+  }))
+}
+
 /**
  * AgentChat — the Nuhoud AI Rehab Coach chat panel.
  *
@@ -54,6 +62,9 @@ const SUGGESTED_PROMPTS = [
  */
 export function AgentChat({ patientId, patientName, variant = 'full' }: AgentChatProps) {
   const { user } = useAuth()
+  const t = useTranslations('coach')
+  const locale = useLocale()
+  const isRTL = locale === 'ar'
   const [messages, setMessages] = React.useState<ChatMessage[]>([])
   const [input, setInput] = React.useState('')
   const [loading, setLoading] = React.useState(false)
@@ -123,7 +134,7 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
         ])
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown error'
-        toast.error('Coach unavailable', { description: msg })
+        toast.error(t('coachUnavailable'), { description: msg })
         setMessages((prev) => [
           ...prev,
           { role: 'assistant', content: `Sorry, I couldn't respond right now (${msg}).`, ts: Date.now() },
@@ -139,13 +150,13 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
     setMessages([])
     try {
       await apiFetch(`/api/v2/agent/chat${patientId ? `?patientId=${patientId}` : ''}`, { method: 'DELETE' })
-      toast.success('Conversation cleared')
+      toast.success(t('conversationCleared'))
     } catch {
       /* silent */
     }
   }, [patientId])
 
-  const isRTL = (text: string) => /[\u0600-\u06FF]/.test(text)
+  const isRTLText = (text: string) => /[\u0600-\u06FF]/.test(text)
 
   // The panel content — shared between the floating (compact/full) and the
   // inline (embedded) variants.
@@ -159,19 +170,19 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
               <MessageSquare className="h-6 w-6 text-teal-500" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Ask your AI Rehab Coach</p>
+              <p className="text-sm font-medium text-foreground">{t('askCoach')}</p>
               <p className="text-xs text-muted-foreground">
-                I know your plan, stats, and progress. Ask me anything.
+                {t('coachPrompt')}
               </p>
             </div>
             <div className="flex w-full flex-col gap-1.5">
-              {SUGGESTED_PROMPTS.slice(0, 4).map((p) => (
+              {getSuggestedPrompts(locale).slice(0, 4).map((p) => (
                 <button
-                  key={p.en}
-                  onClick={() => send(p.en)}
-                  className="rounded-lg border border-border/50 bg-card/60 px-3 py-2 text-left text-xs text-foreground/80 transition-colors hover:border-teal-500/40 hover:bg-teal-500/5"
+                  key={p.key}
+                  onClick={() => send(p.text)}
+                  className="rounded-lg border border-border/50 bg-card/60 px-3 py-2 text-xs text-foreground/80 transition-colors hover:border-teal-500/40 hover:bg-teal-500/5"
                 >
-                  {p.en}
+                  {p.text}
                 </button>
               ))}
             </div>
@@ -198,7 +209,7 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
                   ? 'bg-teal-500 text-teal-50'
                   : 'bg-card border border-border/40 text-foreground',
               )}
-              dir={isRTL(m.content) ? 'rtl' : 'ltr'}
+              dir={isRTLText(m.content) ? 'rtl' : 'ltr'}
             >
               <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
               {m.toolsUsed && m.toolsUsed.length > 0 && m.toolsUsed[0] !== 'fallback_summary' && (
@@ -248,7 +259,7 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
                 void send(input)
               }
             }}
-            placeholder="Type your question…  (Enter to send)"
+            placeholder={t('typeQuestion')}
             rows={1}
             className="nm-scroll-thin max-h-24 flex-1 resize-none rounded-xl border border-border/60 bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-teal-500/50 focus:outline-none focus:ring-1 focus:ring-teal-500/30"
             disabled={loading}
@@ -264,7 +275,7 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
           </Button>
         </div>
         <p className="mt-1.5 text-center text-[10px] text-muted-foreground/60">
-          The coach knows your real rehab data · context-aware responses
+          {t('contextAware')}
         </p>
       </div>
     </>
@@ -283,7 +294,7 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-semibold text-foreground">AI Rehab Coach</span>
               <span className="text-[10px] text-muted-foreground">
-                {patientName ? `Coaching ${patientName}` : user?.name || 'Your assistant'}
+                {patientName ? t('coaching', { name: patientName }) : user?.name || t('yourAssistant')}
               </span>
             </div>
           </div>
@@ -348,7 +359,7 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
                 <div className="flex flex-col leading-tight">
                   <span className="text-sm font-semibold text-foreground">AI Rehab Coach</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {patientName ? `Coaching ${patientName}` : user?.name || 'Your assistant'}
+                    {patientName ? t('coaching', { name: patientName }) : user?.name || t('yourAssistant')}
                   </span>
                 </div>
               </div>

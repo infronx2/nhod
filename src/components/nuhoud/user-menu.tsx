@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { motion } from 'framer-motion'
 import { LogOut, ChevronDown, Stethoscope, UserRound } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,12 +16,9 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { GradientAvatar } from '@/components/nuhoud/gradient-avatar'
 
-/**
- * UserMenu — avatar + name + role badge + logout dropdown.
- * Replaces the language/theme toggles area when authenticated.
- */
 export function UserMenu() {
   const { user, logout } = useAuth()
+  const tc = useTranslations('common')
   if (!user) return null
 
   const isDoctor = user.role.toUpperCase() === 'DOCTOR' || user.role.toUpperCase() === 'ADMIN'
@@ -31,14 +29,10 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <motion.button
           whileTap={{ scale: 0.97 }}
-          className="flex items-center gap-2 rounded-full border border-border/60 bg-card/60 py-1 pr-2 pl-1 text-sm shadow-sm backdrop-blur transition-colors hover:bg-card/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Open user menu"
+          className="flex items-center gap-2 rounded-full border border-border/60 bg-card/60 py-1 ps-1 pe-2 text-sm shadow-sm backdrop-blur transition-colors hover:bg-card/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={tc('signOut')}
         >
-          <GradientAvatar
-            seed={user.avatarSeed}
-            name={user.name}
-            size="h-7 w-7"
-          />
+          <GradientAvatar seed={user.avatarSeed} name={user.name} size="h-7 w-7" />
           <span className="hidden max-w-[120px] truncate font-medium sm:inline">
             {user.name}
           </span>
@@ -51,7 +45,7 @@ export function UserMenu() {
             )}
           >
             <RoleIcon className="h-2.5 w-2.5" />
-            {isDoctor ? 'Doctor' : 'Patient'}
+            {isDoctor ? tc('doctor') ?? 'Doctor' : tc('patient') ?? 'Patient'}
           </span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </motion.button>
@@ -69,7 +63,7 @@ export function UserMenu() {
           className="cursor-pointer gap-2 text-rose-600 focus:text-rose-700 dark:text-rose-400"
         >
           <LogOut className="h-4 w-4" />
-          Sign out
+          {tc('signOut')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

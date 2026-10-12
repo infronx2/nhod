@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { motion } from 'framer-motion'
+import { useTranslations } from 'next-intl'
 import {
   Activity,
   Pause,
@@ -170,6 +171,8 @@ export function MetricsGrid({
   simulated,
   command,
 }: MetricsGridProps) {
+  const t = useTranslations('tracking')
+  const tc = useTranslations('charts')
   // For the live-camera mode, the displayed values come straight from the
   // server's tracking message. In demo mode, `simulated` is true and the
   // angle/score/rep values are computed client-side (the backend will be
@@ -179,19 +182,19 @@ export function MetricsGrid({
 
   const cards: MetricCardProps[] = [
     {
-      label: 'Reps',
+      label: t('reps'),
       value: repCount,
       icon: Repeat,
       accent: 'text-teal-500',
     },
     {
-      label: 'Score',
+      label: tc('score') ?? 'Score',
       value: score,
       icon: Trophy,
       accent: 'text-emerald-500',
     },
     {
-      label: 'Max ROM',
+      label: tc('maxRom'),
       value: `${maxAngle.toFixed(0)}°`,
       icon: Maximize2,
       accent: 'text-sky-400',
@@ -199,13 +202,13 @@ export function MetricsGrid({
       simulated,
     },
     {
-      label: 'Comp. Errors',
+      label: tc('compErrors'),
       value: compensationErrors,
       icon: AlertTriangle,
       accent: 'text-rose-500',
     },
     {
-      label: 'Latency',
+      label: t('latency') ?? 'Latency',
       value: `${latencyMs.toFixed(0)} ms`,
       icon: Timer,
       accent: 'text-amber-500',
@@ -228,13 +231,13 @@ export function MetricsGrid({
         ))}
       </div>
 
-      {/* Daily goal progress */}
+      {/* {t('dailyGoalProgress')} */}
       <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-card p-3">
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5">
             <Icon className="h-3.5 w-3.5 text-teal-500" aria-hidden="true" />
             <span className="font-medium text-muted-foreground">
-              Daily goal progress
+              {t('dailyGoalProgress')}
             </span>
           </div>
           <div className="font-mono text-xs font-semibold text-foreground">
@@ -251,7 +254,7 @@ export function MetricsGrid({
         </div>
         {onGoalChange && (
           <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-            <span>Goal:</span>
+            <span>{t('goal')}:</span>
             <input
               type="number"
               min={1}
@@ -261,7 +264,7 @@ export function MetricsGrid({
               className="w-16 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground"
               aria-label="Daily rep goal"
             />
-            <span>reps</span>
+            <span>{t('reps')}</span>
           </div>
         )}
       </div>
