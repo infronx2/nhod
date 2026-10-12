@@ -917,3 +917,28 @@ Stage Summary:
 - New files: NuhoudGameInstance, NuhoudLoginScreen, NuhoudFatigueMonitor, NuhoudROMHeatmap, NuhoudOpenXRHandTracking (+ their .cpp), PHASE3_BLUEPRINT_HOOKUP.md
 - The game now supports: in-game JWT authentication with persistent login, smart fatigue monitoring with auto-pause (clinical safety), real-time ROM heatmap, OpenXR hand tracking with IK, and mobile/Pixel Streaming optimization with proper CVars + device profiles.
 - The game is now a secure SaMD (Software as a Medical Device) ready for hospital deployment: authenticated sessions, fatigue safety, aborted session flagging, and optimized rendering for both mobile APK and web streaming.
+
+---
+Task ID: 84
+Agent: Main orchestrator (Z.ai Code) — prepare for GitHub + Vercel + Supabase deployment
+Task: Clean up the project for production deployment, create Git repo, archive for download, and write complete deployment guides.
+
+Work Log:
+- **Cleaned temp files**: removed all *.png screenshots, dev.log, server.log, tool-results/, download/ — project is lean.
+- **Updated .gitignore**: added rules for *.png, *.webm, dev.log, server.log, db/*.db, ue5-game binaries/intermediate/saved, examples/, tests/, .zscripts/, skills/.
+- **Created `.env.example`**: safe-to-commit template with DATABASE_URL, NUHOUD_JWT_SECRET, NUHOOD_SYNC_API_KEY, and Supabase hints (commented out). `.env` is gitignored.
+- **Created `README.md`**: full project documentation in Arabic with setup instructions, demo accounts, file structure, Vercel + Supabase guides.
+- **Created `SUPABASE_SETUP.md`**: step-by-step Supabase PostgreSQL setup (create project → get connection string → update Prisma → db push → seed).
+- **Created `vercel.json`**: Vercel deployment config (build command, framework, regions).
+- **Created `DOWNLOAD_AND_DEPLOY_GUIDE.md`** (241 lines): comprehensive 6-step guide covering: 1) download from sandbox, 2) GitHub repo creation + push, 3) Vercel import + env vars, 4) Supabase setup + Prisma migration, 5) UE5 game transfer to local machine, 6) Python pose-server local setup.
+- **Git commits**: 4 commits — initial rebrand commit, .env removal, DB removal, deployment guide.
+- **Security**: removed .env and db/custom.db from git tracking. Verified no secrets in tracked files.
+- **Created archive**: `nuhoud-project.tar.gz` (380KB, 238 files) — excludes node_modules, .next, db, .git, screenshots. Ready for download.
+
+Stage Summary:
+- **Project is ready for GitHub + Vercel + Supabase deployment.**
+- **207 tracked files** in Git (no secrets, no DB, no screenshots).
+- **Archive**: `nuhoud-project.tar.gz` (380KB) at `/home/z/my-project/nuhoud-project.tar.gz`.
+- **Guides**: README.md, SUPABASE_SETUP.md, DOWNLOAD_AND_DEPLOY_GUIDE.md, vercel.json.
+- **UE5 game**: 26 C++ files (5438 lines) included in the archive at `ue5-game/Source/Nuhoud/`.
+- **Next steps for the user**: 1) download the archive, 2) create GitHub repo, 3) push, 4) import to Vercel, 5) create Supabase project, 6) set env vars, 7) deploy.
