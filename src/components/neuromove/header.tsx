@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { WsConnectionState } from '@/components/neuromove/types'
 import { UserMenu } from '@/components/neuromove/user-menu'
+import { NotificationBell } from '@/components/neuromove/notification-bell'
 import { useAuth } from '@/hooks/use-auth'
 
 interface HeaderProps {
@@ -207,6 +208,8 @@ export function Header({ connection, rtl, onToggleRtl }: HeaderProps) {
               )}
             </div>
           )}
+
+          {user && <NotificationBell />}
 
           {user && <UserMenu />}
         </div>

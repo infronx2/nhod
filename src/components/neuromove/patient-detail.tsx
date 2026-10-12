@@ -59,6 +59,7 @@ import { GradientAvatar } from '@/components/neuromove/gradient-avatar'
 import { ActivityChart } from '@/components/neuromove/activity-chart'
 import { AccuracyDonut } from '@/components/neuromove/accuracy-donut'
 import { RomTrendChart } from '@/components/neuromove/rom-trend-chart'
+import { ActivityHeatmap } from '@/components/neuromove/activity-heatmap'
 import { BadgesPanel } from '@/components/neuromove/badges-panel'
 import { FhirViewer } from '@/components/neuromove/fhir-viewer'
 
@@ -374,6 +375,15 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
           />
         </Card>
       </div>
+
+      {/* ---------- Per-patient activity heatmap ---------- */}
+      <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
+        <ActivityHeatmap
+          patientId={patientId}
+          weeks={12}
+          title={`${detail?.patient.name ?? 'Patient'} · activity last 12 weeks`}
+        />
+      </Card>
 
       {/* ---------- Badges + Sessions table ---------- */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

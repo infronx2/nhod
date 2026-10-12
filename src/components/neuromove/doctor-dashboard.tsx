@@ -22,6 +22,7 @@ import { apiFetch } from '@/lib/api'
 import type { V2PatientsResponse, V2PatientSummary, V2Stats } from '@/lib/v2-types'
 import { GradientAvatar } from '@/components/neuromove/gradient-avatar'
 import { AnimatedKpi } from '@/components/neuromove/animated-kpi'
+import { ActivityHeatmap } from '@/components/neuromove/activity-heatmap'
 import { PatientDetail } from '@/components/neuromove/patient-detail'
 
 interface DoctorDashboardProps {
@@ -165,6 +166,11 @@ export function DoctorDashboard({ doctorId }: DoctorDashboardProps) {
           hint="last 7 days, all patients"
         />
       </div>
+
+      {/* ---------- Activity heatmap (global across all patients) ---------- */}
+      <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
+        <ActivityHeatmap weeks={12} title="Clinic activity · last 12 weeks (all patients)" />
+      </Card>
 
       {/* ---------- Roster ---------- */}
       <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">

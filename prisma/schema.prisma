@@ -129,3 +129,49 @@ model EarnedBadge {
   @@unique([userId, slug])
   @@index([userId])
 }
+
+/// Persisted AI coach chat messages — one row per turn. Replaces the
+/// in-memory conversation store so history survives server restarts.
+/// A conversation is identified by (speakerId, patientId): the speaker
+/// is whoever sent the message (patient themselves OR a doctor coaching
+/// them), and patientId is whose clinical context was injected.
+model ChatMessage {
+  id          String   @id @default(cuid())
+  /// Who sent this turn: the patient or the doctor.
+  speakerId   String
+  /// Whose clinical context the agent used (== speakerId for a patient
+  /// coaching themselves; the coached patient for a doctor).
+  patientId   String
+  /// "user" = the human's message, "assistant" = the AI's reply.
+  role        String
+  content     String
+  createdAt   DateTime @default(now())
+
+  @@index([speakerId, patientId, createdAt])
+  @@index([patientId])
+}
+
+/// Notification feed entries — badge earned, plan prescribed, streak
+/// milestone, AI coach summary, etc. Shown in the header bell dropdown.
+model Notification {
+  id        String   @id @default(cuid())
+  /// The user who should see this notification.
+  userId    String
+  /// "badge_earned" | "plan_prescribed" | "streak_milestone" |
+  /// "session_saved" | "coach_summary" | "info"
+  type      String   @default("info")
+  /// Short headline, e.g. "Badge earned: Perfect Form".
+  title     String
+  /// Longer body, e.g. "You completed a session with zero compensation errors."
+  body      String?
+  /// Severity for color-coding: "success" | "info" | "warning" | "celebration".
+  severity  String   @default("info")
+  /// Optional link target (e.g. a session id or patient id).
+  linkType  String?
+  linkId    String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([userId])
+}

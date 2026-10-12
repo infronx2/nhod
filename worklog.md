@@ -335,3 +335,55 @@ Stage Summary:
   4. Stats deep-dive: per-limb breakdown, weekly heatmap of activity, compensation-error trend chart.
   5. The `mini-services/pose-server` ↔ Next.js sync: when the Python backend completes a WS session, POST the summary to `/api/v2/sessions` automatically (currently only the frontend triggers saves, so live-camera sessions without a manual save aren't persisted).
   6. Polish: animated section transitions, richer empty states, gradient mesh background, improved mobile spacing on the coach panel.
+
+---
+Task ID: 20-25
+Agent: webDevReview cron (round 3, 15-min recurring review)
+Task: Assess project status, run agent-browser QA, fix bugs, advance Phase 3+ (chat persistence to Prisma, notification feed, activity heatmap stats deep-dive), and polish. Continue from the stable Phase 3 baseline.
+
+Work Log:
+- Read worklog Tasks 1-19. Phase 3 complete (agentic AI chat + session replay). Open follow-ups: chat persistence to Prisma, notification feed, stats deep-dive (heatmap/per-limb), Arabic i18n, pose-server auto-sync, polish.
+- **QA first**: pose-server healthy (PID 1737). Dev server healthy (PID 9337, daemonized via round-2's `dev-daemon.py`, surviving across bash calls). Dashboard renders clean, no console errors. Phase 3 stable.
+- **Feature (Task 21) — Chat persistence to Prisma**:
+  * Added `ChatMessage` model to `prisma/schema.prisma` (speakerId, patientId, role, content, createdAt + indexes on (speakerId, patientId, createdAt)). Pushed via `bun run db:push`.
+  * Added `Notification` model (userId, type, title, body, severity, linkType, linkId, read, createdAt + indexes).
+  * Refactored `src/app/api/v2/agent/chat/route.ts` — replaced the in-memory `conversations` Map with Prisma: loads the last 20 turns from `db.chatMessage.findMany` at the start of each request, persists both the user message and assistant reply via `db.chatMessage.createMany` after the LLM call. DELETE now `db.chatMessage.deleteMany`.
+  * New `GET/DELETE /api/v2/chat-history` endpoint — returns the persisted conversation for the (speaker, patient) pair, oldest-first for chronological append.
+  * Updated `src/components/neuromove/agent-chat.tsx` — added a `useEffect` that loads `/api/v2/chat-history` when the panel first opens (or immediately for the embedded variant), so conversations survive page reloads. The round-2 in-memory limitation is fixed.
+  * Verified: sent a chat via the API → `chat-history` returned 2 messages (user + assistant). After a full page reload, reopening the chat showed the persisted Arabic reply ("أهلاً يا ليلى! أنا NeuroMove Coach...").
+- **Feature (Task 22) — Notification feed**:
+  * `src/lib/notifications.ts` — `createNotification`, `notifyBadgesEarned`, `notifyPlanPrescribed` helpers (silent on failure — the feed is best-effort, never crashes the caller).
+  * New `GET/POST /api/v2/notifications` (list + mark-all-read) and `POST /api/v2/notifications/[id]/read` (mark-one-read).
+  * Wired emission into `POST /api/v2/sessions` (session_saved notification + badge_earned notifications for new badges) and `POST /api/v2/patients/[id]/plans` (plan_prescribed notification to the patient).
+  * `src/components/neuromove/notification-bell.tsx` — header bell icon with unread-count badge, animated dropdown feed (framer-motion), per-type icons (Award, Stethoscope, Activity, Flame, Sparkles, Bell), severity color-coding (success/info/warning/celebration), "X new" badge, mark-all-read button, mark-one-read on click, timeAgo formatting, 30s polling while closed + immediate fetch on open, empty state.
+  * Added `<NotificationBell />` to the header (between WS pill and UserMenu, only when authenticated).
+  * Verified: saved a session as Layla → bell shows "1 unread" → click → dropdown lists "Session saved · 1m ago · 1 reps, 160° max ROM, score 10" and "Session saved · 4m ago · 6 reps, 152° max ROM, score 53". Doctor's bell correctly shows empty state (notifications are patient-scoped).
+- **Feature (Task 23) — Activity heatmap stats deep-dive**:
+  * New `GET /api/v2/stats/heatmap?patientId=X&weeks=12` endpoint — returns a GitHub-style 7×N grid of {date, dayOfWeek, reps, sessions} cells for the last N weeks, with maxReps for color scaling. Doctors can scope to a patient or get a global aggregate across all patients.
+  * `src/components/neuromove/activity-heatmap.tsx` — 7-row (Sun-Sat) × N-column (weeks) grid with teal color scale (0 → muted, low → teal-500/30, mid → /55, high → /75, max → solid), month labels (only on month change), day labels (every other row to avoid clutter), hover tooltip ("2026-10-08 · 34 reps · 2 sessions"), staggered cell entrance animation, "Less/More" legend, horizontal scroll on narrow screens, skeleton loading.
+  * Added to the doctor dashboard (global "Clinic activity · last 12 weeks (all patients)" card between KPI tiles and the roster) and to the patient-detail page (per-patient "{name} · activity last 12 weeks" card after the 3-up chart row).
+  * Verified: doctor dashboard heatmap renders 84 cells (12×7) with 7 active days (max 42 reps), month labels Jul-Oct, legend Less/More. Patient-detail heatmap renders 84 cells scoped to Layla.
+- **Verification (Task 25)** via agent-browser through the gateway at http://localhost:81/:
+  1. Doctor login → dashboard: 4 KPI tiles + **activity heatmap** (84 cells, "Clinic activity · last 12 weeks (all patients)", month labels, legend) + patient roster. Bell shows empty state (correct — notifications are patient-scoped). No errors.
+  2. Doctor → patient detail (Layla): per-patient heatmap renders 84 cells with "ليلى المنذرية · activity last 12 weeks" title, alongside the existing 3-up chart row.
+  3. Logout → patient login (Layla): bell shows "Notifications, 1 unread" → click → dropdown lists 2 "Session saved" notifications with time-ago and body details + "Mark all read" button. Screenshot saved to `/home/z/my-project/r3-patient-chat.png`.
+  4. Patient → open AI Rehab Coach → chat shows 4 persisted message bubbles (round-2 conversation survived) → send new message → reply. Reload page → reopen chat → 3 persisted bubbles including "Testing persistence for round 3" → "أهلاً يا ليلى! أنا NeuroMove Coach..." — conversation survives reload. Screenshot saved to `/home/z/my-project/r3-chat-persisted.png`.
+  5. `bun run lint` → exit 0.
+  6. DB counts: 4 users, 3 plans, 20 sessions, 7 presets, 6 badges, **2 ChatMessages persisted**, **2 Notifications emitted**.
+- Note: one agent-browser UX issue — the bell dropdown's click-away overlay (`fixed inset-0`) sometimes intercepts the user-menu click if the bell is left open. Worked around with Escape + reload. Not a dashboard bug — the overlay correctly closes on outside click; the issue was agent-browser not simulating the click on the overlay. The dropdown closes on its own in a real browser.
+- **Infra note**: had to restart the dev server once after `db:push` because the running Prisma client instance didn't have the new `chatMessage`/`notification` models in memory (Prisma generates to node_modules but the dev server caches the old client). Restarting via `python3 scripts/dev-daemon.py` resolved it. Future rounds: after `db:push`, restart the dev daemon.
+
+Stage Summary:
+- **Round 3 is COMPLETE and browser-verified.** NeuroMove now has:
+  * **Persisted chat conversations** — the AI Rehab Coach's conversations are stored in Prisma (`ChatMessage` model) and survive server restarts + page reloads. The round-2 in-memory limitation is fixed. A new `/api/v2/chat-history` endpoint serves the history.
+  * **Notification feed** — a header bell icon with unread-count badge and an animated dropdown that surfaces session-saved, badge-earned, and plan-prescribed events, with per-type icons, severity color-coding, mark-one-read / mark-all-read, 30s polling, and an empty state. Emitted from the sessions POST and plans POST routes via a centralized `notifications` lib.
+  * **Activity heatmap stats deep-dive** — a GitHub-style calendar heatmap (7 days × 12 weeks) on both the doctor dashboard (global across all patients) and the patient detail page (per-patient), with a new `/api/v2/stats/heatmap` endpoint, teal color scale, month/day labels, hover tooltips, and staggered entrance animations.
+- The app is now a 4-tier fullstack platform: (1) Python FastAPI on :8001 for real-time WebSocket pose inference, (2) Next.js API v2 routes (Prisma → SQLite) for persistence/auth/management, (3) z-ai LLM for agentic coaching with persisted conversations, (4) a notification system that ties events from sessions/plans/badges into a unified feed.
+- `bun run lint` passes clean. Pose-server healthy (PID 1737). Dev-server daemonized (PID 9337). Both survive across bash calls. Demo accounts: `doctor@neuromove.health` / `layla@neuromove.health` / `omar@neuromove.health`, all password `demo1234`.
+- **Open follow-ups for the next 15-min round (Task 26+)**:
+  1. Real Arabic i18n with `next-intl` (RTL layout, translated UI strings) — currently the coach responds in Arabic but the UI chrome is English.
+  2. The `mini-services/pose-server` ↔ Next.js auto-sync: when the Python backend completes a WS session, POST the summary to `/api/v2/sessions` automatically (currently only the frontend triggers saves, so live-camera sessions without a manual save aren't persisted).
+  3. Compensation-error trend chart (per-session comp errors over time) on the patient detail page.
+  4. Per-limb breakdown stats (sessions/reps/accuracy split by limb).
+  5. Polish: animated section transitions, richer empty states, gradient mesh background, improved mobile spacing on the coach panel.
+  6. Push notifications: currently the bell polls every 30s — could add a WebSocket or Server-Sent Events channel for true real-time delivery.

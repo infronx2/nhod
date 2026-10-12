@@ -48,6 +48,10 @@ export async function POST(
     data: { active: false },
   })
 
+  // Notify the patient about the new plan.
+  const { notifyPlanPrescribed } = await import('@/lib/notifications')
+  await notifyPlanPrescribed(patientId, plan.title, plan.targetAngle)
+
   return NextResponse.json({ ok: true, plan })
 }
 

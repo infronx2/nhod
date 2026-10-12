@@ -3,9 +3,6 @@ import { db } from '@/lib/db'
 import { getUserFromRequest } from '@/lib/auth'
 import { buildAgentContext, composeSystemPrompt } from '@/lib/agent-context'
 
-// In-memory conversation store (per user, last 20 messages).
-// Phase 3+: move to a Prisma `ChatMessage` model for persistence.
-const conversations = new Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>()
 const MAX_HISTORY = 20
 
 /**
@@ -19,6 +16,11 @@ const MAX_HISTORY = 20
  * z-ai LLM with the full conversation history. This is "tool-use by context
  * injection" — robust for a small fixed tool set and avoids the round-trip
  * latency + tool-selection hallucination of native function-calling.
+ *
+ * Conversation history is now persisted to the Prisma `ChatMessage` model so
+ * it survives server restarts. We load the last MAX_HISTORY turns from the DB
+ * at the start of each request, append the new turn (user message + AI
+ * reply), and persist both rows.
  *
  * Body: { message: string, patientId?: string }
  * - Doctors must specify a patientId to coach that patient.
@@ -79,10 +81,16 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = composeSystemPrompt(ctx, patientUser.preferredDialect)
 
-  // Load conversation history for this user (keyed by who's asking, so the
-  // doctor coaching patient A has a different history than patient A themselves).
-  const convKey = `${payload.sub}->${patientId}`
-  const history = conversations.get(convKey) ?? []
+  // Load persisted conversation history (last MAX_HISTORY turns) for this
+  // (speaker, patient) pair.
+  const recentDbMessages = await db.chatMessage.findMany({
+    where: { speakerId: payload.sub, patientId },
+    orderBy: { createdAt: 'desc' },
+    take: MAX_HISTORY,
+  })
+  const history = recentDbMessages
+    .reverse()
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
   // Compose the messages for the LLM.
   const llmMessages: Array<{ role: 'assistant' | 'user'; content: string }> = [
@@ -113,13 +121,18 @@ export async function POST(req: NextRequest) {
     toolsUsed = ['fallback_summary']
   }
 
-  // Update conversation history (cap at MAX_HISTORY, keep system implicit).
-  history.push({ role: 'user', content: message })
-  history.push({ role: 'assistant', content: reply })
-  if (history.length > MAX_HISTORY) {
-    history.splice(0, history.length - MAX_HISTORY)
+  // Persist both turns (user message + assistant reply) to the DB so the
+  // conversation survives server restarts.
+  try {
+    await db.chatMessage.createMany({
+      data: [
+        { speakerId: payload.sub, patientId, role: 'user', content: message },
+        { speakerId: payload.sub, patientId, role: 'assistant', content: reply },
+      ],
+    })
+  } catch (err) {
+    console.warn('[agent/chat] persist failed', err)
   }
-  conversations.set(convKey, history)
 
   return NextResponse.json({
     ok: true,
@@ -134,12 +147,12 @@ export async function POST(req: NextRequest) {
       hasActivePlan: !!ctx.activePlan,
       earnedBadgesCount: ctx.earnedBadges.length,
     },
-    historyLength: history.length,
+    historyLength: history.length + 2,
   })
 }
 
 /**
- * DELETE /api/v2/agent/chat?patientId=X — clear conversation history.
+ * DELETE /api/v2/agent/chat?patientId=X — clear persisted conversation history.
  */
 export async function DELETE(req: NextRequest) {
   const payload = getUserFromRequest(req)
@@ -156,7 +169,8 @@ export async function DELETE(req: NextRequest) {
         ? String(patientId)
         : payload.sub
     : payload.sub
-  const convKey = `${payload.sub}->${targetPatient}`
-  conversations.delete(convKey)
-  return NextResponse.json({ ok: true, cleared: convKey })
+  const result = await db.chatMessage.deleteMany({
+    where: { speakerId: payload.sub, patientId: targetPatient },
+  })
+  return NextResponse.json({ ok: true, deleted: result.count })
 }

@@ -90,6 +90,21 @@ export async function POST(req: NextRequest) {
   // Gamification: award any newly-earned badges for this patient.
   const newBadges = await awardBadges(body.patientId)
 
+  // Emit a session-saved notification + badge-earned notifications.
+  const { createNotification, notifyBadgesEarned } = await import('@/lib/notifications')
+  await createNotification({
+    userId: body.patientId,
+    type: 'session_saved',
+    title: 'Session saved',
+    body: `${session.totalReps} reps, ${session.maxAchievedAngle.toFixed(0)}° max ROM, score ${session.gamificationScore}.`,
+    severity: 'success',
+    linkType: 'session',
+    linkId: session.id,
+  })
+  if (newBadges.length > 0) {
+    await notifyBadgesEarned(body.patientId, newBadges.map((b) => b.slug))
+  }
+
   return NextResponse.json({ ok: true, session, newBadges })
 }
 

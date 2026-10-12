@@ -64,6 +64,35 @@ export function AgentChat({ patientId, patientName, variant = 'full' }: AgentCha
   // floating button — the parent controls visibility by mounting/unmounting.
   const embedded = variant === 'embedded'
 
+  // Load persisted conversation history from the DB when the panel first opens
+  // (or immediately for the embedded variant). This makes conversations survive
+  // page reloads — a round-2 follow-up now fixed.
+  React.useEffect(() => {
+    if (!user) return
+    if (!embedded && !open) return
+    let cancelled = false
+    const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
+    apiFetch<{ ok: boolean; messages: Array<{ role: string; content: string; createdAt: string }> }>(
+      `/api/v2/chat-history${qs}`,
+    )
+      .then((data) => {
+        if (cancelled || !data.ok) return
+        setMessages(
+          data.messages.map((m) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            ts: new Date(m.createdAt).getTime(),
+          })),
+        )
+      })
+      .catch(() => {
+        /* silent — history load is best-effort */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user, open, embedded, patientId])
+
   // Auto-scroll to the latest message.
   React.useEffect(() => {
     if (scrollRef.current) {
