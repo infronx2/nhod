@@ -142,4 +142,66 @@
   .nm-scroll-thin::-webkit-scrollbar-thumb:hover {
     background-color: rgba(148, 163, 184, 0.55);
   }
+
+  /* Gradient mesh background — a soft, animated clinical aurora behind the
+     main content. Uses teal/emerald/amber at low opacity so it reads as a
+     subtle medical-grade glow without distracting from the data. */
+  .nm-mesh-bg {
+    position: relative;
+    isolation: isolate;
+  }
+  .nm-mesh-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(ellipse 60% 50% at 15% 10%, rgba(20, 184, 166, 0.08), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 85% 20%, rgba(16, 185, 129, 0.06), transparent 60%),
+      radial-gradient(ellipse 55% 45% at 70% 85%, rgba(245, 158, 11, 0.05), transparent 60%),
+      radial-gradient(ellipse 45% 35% at 25% 75%, rgba(244, 63, 94, 0.04), transparent 60%);
+    pointer-events: none;
+  }
+  .dark .nm-mesh-bg::before {
+    background:
+      radial-gradient(ellipse 60% 50% at 15% 10%, rgba(20, 184, 166, 0.12), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 85% 20%, rgba(16, 185, 129, 0.09), transparent 60%),
+      radial-gradient(ellipse 55% 45% at 70% 85%, rgba(245, 158, 11, 0.07), transparent 60%),
+      radial-gradient(ellipse 45% 35% at 25% 75%, rgba(244, 63, 94, 0.06), transparent 60%);
+  }
+
+  /* Glassmorphism card — frosted glass effect for KPI tiles and feature cards. */
+  .nm-glass {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  }
+  .dark .nm-glass {
+    background: rgba(30, 41, 59, 0.55);
+  }
+
+  /* Subtle pulse glow for live/recording indicators. */
+  @keyframes nm-pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(20, 184, 166, 0); }
+  }
+  .nm-pulse-glow {
+    animation: nm-pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* Shimmer skeleton — nicer than a plain grey box. */
+  @keyframes nm-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .nm-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(148, 163, 184, 0.1) 25%,
+      rgba(148, 163, 184, 0.2) 50%,
+      rgba(148, 163, 184, 0.1) 75%
+    );
+    background-size: 200% 100%;
+    animation: nm-shimmer 1.5s ease-in-out infinite;
+  }
 }

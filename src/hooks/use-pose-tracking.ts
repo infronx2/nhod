@@ -18,6 +18,12 @@ export interface PoseTrackingConfig {
   limb: 'right' | 'left'
   target_angle: number
   compensation_threshold: number
+  /**
+   * The authenticated patient's id. When set, the WS URL includes it as a
+   * query param so the Python pose-server can auto-sync the completed
+   * session to the Next.js DB on WS close (no manual Save needed).
+   */
+  patient_id?: string
 }
 
 export interface PoseTrackingState {
@@ -119,9 +125,10 @@ export function usePoseTracking(initial: PoseTrackingConfig): PoseTrackingApi {
 
     const host = window.location.host
     const cfg = configRef.current
+    const patientParam = cfg.patient_id ? `&patient_id=${encodeURIComponent(cfg.patient_id)}` : ''
     const url = `ws://${host}${WS_PATH}?XTransformPort=8001&limb=${encodeURIComponent(
       cfg.limb,
-    )}&target_angle=${cfg.target_angle}&compensation_threshold=${cfg.compensation_threshold}`
+    )}&target_angle=${cfg.target_angle}&compensation_threshold=${cfg.compensation_threshold}${patientParam}`
 
     manualCloseRef.current = false
     setConnection('Connecting')

@@ -41,6 +41,7 @@ import binascii
 import json
 import logging
 import math
+import os
 import time
 from collections import deque
 from contextlib import asynccontextmanager
@@ -248,6 +249,50 @@ class SessionState:
 completed_sessions: list[dict] = []
 active_connections: int = 0
 
+# Internal API key + target URL for the Next.js auto-sync (system-to-system).
+# The Next.js side validates the same key on POST /api/v2/sessions/sync.
+SYNC_API_KEY = os.environ.get("NEUROMOVE_SYNC_API_KEY", "neuromove-internal-sync-dev-7f3a9e1b")
+NEXTJS_BASE_URL = os.environ.get("NEUROMOVE_NEXTJS_URL", "http://localhost:3000")
+
+
+async def sync_session_to_nextjs(summary: dict) -> bool:
+    """
+    POST a completed session summary to the Next.js /api/v2/sessions/sync
+    endpoint so live-camera sessions are persisted to the SQLite DB even when
+    the UE5/browser client never calls POST /api/v2/sessions manually.
+
+    Best-effort: logs a warning on failure but never raises — the WS loop
+    must not crash because the sync target is down.
+
+    The actual HTTP call is synchronous (urllib), so we run it in a worker
+    thread via asyncio.to_thread to avoid blocking the uvicorn event loop.
+    """
+    def _do_sync() -> bool:
+        try:
+            import urllib.request
+            import json as _json
+            payload = _json.dumps(summary).encode("utf-8")
+            req = urllib.request.Request(
+                f"{NEXTJS_BASE_URL}/api/v2/sessions/sync",
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-NeuroMove-Key": SYNC_API_KEY,
+                },
+                method="POST",
+            )
+            # Short timeout so a slow Next.js never blocks the WS close handler.
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                resp.read()  # drain
+                return resp.status == 200
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Session sync to Next.js failed: %s", exc)
+            return False
+
+    ok = await asyncio.to_thread(_do_sync)
+    logger.info("Session synced to Next.js: ok=%s", ok)
+    return ok
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -394,6 +439,7 @@ async def track(
     limb: str = Query("right", description="'right' or 'left' upper limb"),
     target_angle: float = Query(90.0, description="Target elbow flexion in degrees"),
     compensation_threshold: float = Query(0.05, description="Shrug threshold (normalized Y)"),
+    patient_id: str = Query("", description="Patient ID for auto-sync to the Next.js DB"),
 ):
     """
     Real-time pose tracking WebSocket.
@@ -482,9 +528,9 @@ async def track(
         active_connections -= 1
         # Persist a lightweight summary so the dashboard can show history.
         if session.frames_processed > 0:
-            completed_sessions.append({
+            local_record = {
                 "id": f"ws_{int(time.time()*1000)}",
-                "patient_id": "live_session",
+                "patient_id": patient_id or "live_session",
                 "plan_id": None,
                 "session_date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "duration_seconds": 0,
@@ -494,9 +540,28 @@ async def track(
                 "compensation_errors": session.compensation_errors,
                 "gamification_score": session.score,
                 "frames_processed": session.frames_processed,
-            })
-        logger.info("WS /ws/track closed reps=%s score=%s active=%s",
-                    session.rep_count, session.score, active_connections)
+            }
+            completed_sessions.append(local_record)
+
+            # Auto-sync to the Next.js DB so live-camera sessions are persisted
+            # even if the client never calls POST /api/v2/sessions manually.
+            # Only sync when a real patient_id was supplied on the WS connect.
+            if patient_id:
+                sync_payload = {
+                    "patient_id": patient_id,
+                    "plan_id": None,
+                    "source": "live",
+                    "limb": session.limb,
+                    "duration_seconds": 0,
+                    "total_reps": session.rep_count,
+                    "correct_reps": session.rep_count,
+                    "max_achieved_angle": round(session.max_achieved_angle, 2),
+                    "compensation_errors": session.compensation_errors,
+                    "gamification_score": session.score,
+                }
+                await sync_session_to_nextjs(sync_payload)
+        logger.info("WS /ws/track closed reps=%s score=%s active=%s patient=%s",
+                    session.rep_count, session.score, active_connections, patient_id or "anon")
 
 
 async def _tracking_loop(websocket: WebSocket, session: SessionState, pose) -> None:

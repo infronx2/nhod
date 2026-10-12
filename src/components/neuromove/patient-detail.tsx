@@ -60,6 +60,8 @@ import { ActivityChart } from '@/components/neuromove/activity-chart'
 import { AccuracyDonut } from '@/components/neuromove/accuracy-donut'
 import { RomTrendChart } from '@/components/neuromove/rom-trend-chart'
 import { ActivityHeatmap } from '@/components/neuromove/activity-heatmap'
+import { CompTrendChart } from '@/components/neuromove/comp-trend-chart'
+import { LimbBreakdown } from '@/components/neuromove/limb-breakdown'
 import { BadgesPanel } from '@/components/neuromove/badges-panel'
 import { FhirViewer } from '@/components/neuromove/fhir-viewer'
 
@@ -384,6 +386,16 @@ export function PatientDetail({ patientId, onBack, onPlanCreated }: PatientDetai
           title={`${detail?.patient.name ?? 'Patient'} · activity last 12 weeks`}
         />
       </Card>
+
+      {/* ---------- Clinical trends: compensation trend + per-limb breakdown ---------- */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur">
+          <CompTrendChart sessions={detail?.sessions ?? []} loading={loading} />
+        </Card>
+        <Card className="border-border/40 bg-card/60 p-4 shadow-sm backdrop-blur">
+          <LimbBreakdown sessions={detail?.sessions ?? []} loading={loading} />
+        </Card>
+      </div>
 
       {/* ---------- Badges + Sessions table ---------- */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

@@ -150,7 +150,7 @@ export function AuthScreen() {
   }
 
   return (
-    <div className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
+    <div className="nm-mesh-bg grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
       {/* ---------- Left: brand panel ---------- */}
       <div className="relative hidden overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 lg:flex lg:flex-col lg:justify-between lg:p-12">
         {/* radial teal glow behind the logo */}

@@ -87,10 +87,13 @@ function PatientDashboard() {
 
   // Single shared pose-tracking instance — feeds the header connection
   // pill, the JSON stream panel and the tracking panel itself.
+  // The patient_id is passed so the Python pose-server auto-syncs the
+  // completed session to the Next.js DB on WS close (no manual Save needed).
   const pose = usePoseTracking({
     limb: 'right',
     target_angle: 90,
     compensation_threshold: 0.05,
+    patient_id: user?.id,
   })
 
   const fetchDetail = React.useCallback(async () => {
@@ -159,7 +162,7 @@ function PatientDashboard() {
   }, [stats])
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="nm-mesh-bg flex min-h-screen flex-col bg-background">
       <Header
         connection={pose.connection}
         rtl={rtl}
@@ -252,7 +255,7 @@ function DoctorView() {
   const [rtl] = React.useState(false)
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="nm-mesh-bg flex min-h-screen flex-col bg-background">
       <Header
         rtl={rtl}
         onToggleRtl={() => {
